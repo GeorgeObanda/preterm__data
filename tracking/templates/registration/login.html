@@ -1,0 +1,181 @@
+{% extends "tracking/base.html" %}
+{% load static %}
+
+{% block back_button %}{% endblock %}
+
+{% block content %}
+<style>
+  body {
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  .login-card {
+    background: linear-gradient(145deg, #ffffff 0%, #f7f7f7 100%);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+    max-width: 400px;
+    width: 100%;
+    padding: 3rem 2rem 2rem 2rem;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .login-card:hover {
+    box-shadow: 0 25px 60px rgba(0,0,0,0.2);
+  }
+
+  .logo-top {
+    height: 70px;
+    margin-bottom: 1.5rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  h3 {
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 2rem;
+    letter-spacing: 1px;
+  }
+
+  .form-group {
+    position: relative;
+    margin-bottom: 1.8rem;
+    text-align: left;
+  }
+
+  .form-control {
+    border-radius: 10px;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1.5px solid #ddd;
+    width: 100%;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus {
+    border-color: #6a11cb;
+    box-shadow: 0 0 10px rgba(106,17,203,0.25);
+    outline: none;
+  }
+
+  .form-group label {
+    position: absolute;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+    background: transparent;
+    color: #888;
+    font-weight: 500;
+    pointer-events: none;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .form-control:focus + label,
+  .form-control:not(:placeholder-shown) + label {
+    top: -0.5rem;
+    left: 0.8rem;
+    font-size: 0.85rem;
+    color: #6a11cb;
+    background: #fff;
+    padding: 0 0.2rem;
+  }
+
+  .form-icon {
+    position: absolute;
+    top: 50%;
+    right: 1rem;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    color: #888;
+  }
+
+  button.btn-primary {
+    background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    width: 100%;
+  }
+
+  button.btn-primary:hover {
+    background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+    transform: translateY(-2px);
+  }
+
+  .forgot-text, .signup-text {
+    font-size: 0.9rem;
+    color: #555;
+    margin-top: 1rem;
+  }
+
+  .signup-text a {
+    font-weight: 600;
+    color: #2575fc;
+    text-decoration: none;
+  }
+
+  .signup-text a:hover {
+    text-decoration: underline;
+  }
+
+  .logo-bottom {
+    height: 40px;
+    margin-top: 2rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 500px) {
+    .login-card { padding: 2rem 1.5rem; }
+  }
+</style>
+
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 85vh;">
+  <div class="login-card">
+    <!-- Partner logo at top -->
+    <img src="{% static 'images/partner_logo.png' %}" alt="Partner Logo" class="logo-top">
+
+    <h3>Preterm Data Tracker</h3>
+
+    {% if form.errors %}
+      <div class="alert alert-danger" role="alert">
+        <strong>Login failed:</strong> Please check your username and password.
+      </div>
+    {% endif %}
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <div class="form-group">
+        <input type="text" name="username" id="id_username" class="form-control" placeholder=" " required
+               value="{{ form.username.value|default:'' }}">
+        <label for="id_username">Username</label>
+        <span class="form-icon">&#128100;</span>
+      </div>
+      <div class="form-group">
+        <input type="password" name="password" id="id_password" class="form-control" placeholder=" " required>
+        <label for="id_password">Password</label>
+        <span class="form-icon">&#128274;</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+
+    <small class="forgot-text">Forgot your password? Contact the system administrator.</small>
+
+    <div class="signup-text">
+      New here? <a href="{% url 'tracking:signup' %}">Create an account</a>
+    </div>
+
+    <!-- Main logo at bottom -->
+    <img src="{% static 'images/logo.jpg' %}" alt="Main Logo" class="logo-bottom">
+  </div>
+</div>
+{% endblock %}

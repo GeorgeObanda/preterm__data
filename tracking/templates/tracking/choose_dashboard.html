@@ -1,0 +1,150 @@
+{% extends "tracking/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+
+  <!-- Summary Cards -->
+  <div class="row mb-5 g-4">
+    <div class="col-md-3">
+      <div class="card text-white bg-success shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Participants</h5>
+          <p class="card-text fs-3">{{ participants|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white bg-warning shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Pending</h5>
+          <p class="card-text fs-3">{{ pending|length }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-white bg-info shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Complete Data</h5>
+          <p class="card-text fs-3">{{ completed|length }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pending Downloads -->
+  <div class="card mb-5 shadow-sm">
+    <div class="card-header bg-warning text-dark fw-semibold fs-5">Pending Downloads/Uploads</div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Study ID</th>
+            <th>Missing</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in pending %}
+          <tr>
+            <td>{{ item.participant.study_id }}</td>
+            <td>
+              {% for missing_field in item.missing %}
+                <span class="badge bg-danger me-1">{{ missing_field }}</span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="2" class="text-center text-muted fst-italic">No pending downloads.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Completed Downloads / Archive -->
+  <div class="card shadow-sm mb-5">
+    <div class="card-header bg-info text-white fw-semibold fs-5 d-flex justify-content-between align-items-center">
+      <span>Completed Downloads (Archive)</span>
+      <a href="{% url 'tracking:download_completed_pdf' %}" class="btn btn-danger btn-sm">
+        <i class="bi bi-file-earmark-pdf"></i> Download PDF
+      </a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover mb-0 text-center">
+        <thead class="table-light">
+          <tr>
+            <th>Study ID</th>
+            <th>Enrollment Date</th>
+            <th>Due Date</th>
+            <th>Monitor</th>
+            <th>Ultrasound</th>
+            <th>Head US Images</th>
+            <th>Head US Report</th>
+            <th>CRF</th>
+            <th>Video Laryngoscope</th>
+            <th>ROP Final Report</th>
+            <th>Cost Effectiveness</th>
+            <th>Blood Culture</th>
+            <th>Admission Notes Day 1</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in completed %}
+          <tr>
+            <td>{{ p.study_id }}</td>
+            <td>{{ p.enrollment_date|date:"M d, Y" }}</td>
+            <td>{{ p.due_date|date:"M d, Y" }}</td>
+            <td>{% if p.monitor_downloaded %}✅{% endif %}</td>
+            <td>{% if p.ultrasound_downloaded %}✅{% endif %}</td>
+            <td>{% if p.head_ultrasound_images_uploaded %}✅{% endif %}</td>
+            <td>{% if p.head_ultrasound_report_uploaded %}✅{% endif %}</td>
+            <td>{% if p.case_report_form_uploaded %}✅{% endif %}</td>
+            <td>{% if p.video_laryngoscope_uploaded %}✅{% endif %}</td>
+            <td>{% if p.rop_final_report_uploaded %}✅{% endif %}</td>
+            <td>{% if p.cost_effectiveness_data_uploaded %}✅{% endif %}</td>
+            <td>{% if p.blood_culture_done %}✅{% endif %}</td>
+            <td>{% if p.admission_notes_day1_uploaded %}✅{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="13" class="text-center text-muted fst-italic">No completed participants for your site.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- All Participants -->
+  <div class="card mb-5 shadow-sm">
+    <div class="card-header bg-success text-white fw-semibold fs-5">All Participants</div>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Study ID</th>
+            <th>Site</th>
+            <th>Enrollment Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in participants %}
+          <tr>
+            <td>{{ p.study_id }}</td>
+            <td>{{ p.site.name }}</td>
+            <td>{{ p.enrollment_date|date:"F j, Y" }}</td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-center text-muted fst-italic">No participants found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

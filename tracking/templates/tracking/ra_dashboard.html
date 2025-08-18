@@ -1,0 +1,58 @@
+{% extends "tracking/base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Preterm Babies Registered</h2>
+        <a href="{% url 'tracking:register_participant' %}" class="btn btn-primary">
+            + Register New Participant
+        </a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle text-center">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-start">Study ID</th>
+                    <th class="text-start">Enrollment Date</th>
+                    <th class="text-start">Due Date</th>
+                    <th>Days Remaining</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in participants %}
+                    {% if not p.completed %}
+                    <tr>
+                        <td class="text-start">
+                            <a href="{% url 'tracking:participant_detail' p.pk %}" class="text-decoration-none">
+                                {{ p.study_id }}
+                            </a>
+                        </td>
+                        <td class="text-start">{{ p.enrollment_date|date:"Y-m-d" }}</td>
+                        <td class="text-start">{{ p.due_date|date:"Y-m-d" }}</td>
+                        <td>
+                            <span class="badge rounded-pill px-3 py-2"
+                                  style="background-color:
+                                      {% if p.days_remaining < 3 %}#dc3545
+                                      {% elif p.days_remaining < 5 %}#fd7e14
+                                      {% else %}#28a745
+                                      {% endif %};
+                                      color: white;">
+                                {{ p.days_remaining }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        No participants found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "tracking/components/back_button.html" %}
+</div>
+{% endblock %}

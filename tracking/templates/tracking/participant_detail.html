@@ -1,0 +1,139 @@
+{% extends "tracking/base.html" %}
+{% block content %}
+<div class="container my-5">
+
+    <h2 class="mb-4 text-primary fw-bold text-center">Participant Details</h2>
+
+    <div class="card shadow-lg rounded-4 mx-auto" style="max-width: 850px;">
+        <div class="card-body">
+
+            <!-- Participant Info Card -->
+            <div class="card mb-4 border-info shadow-sm">
+                <div class="card-header bg-info text-white fw-bold">
+                    Basic Information
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between">
+                        Study ID: <span class="text-secondary">{{ participant.study_id }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Site: <span class="text-secondary">{{ participant.site.name }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Enrollment Date: <span class="text-secondary">{{ participant.enrollment_date|date:"F j, Y" }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
+                        Due Date: <span class="text-secondary">{{ participant.due_date|date:"F j, Y" }}</span>
+                    </li>
+                    <li class="list-group-item text-center">
+                        Days Remaining for data download and Upload:
+                        {% if participant.days_remaining > 3 %}
+                            <span class="badge bg-success rounded-pill fs-6">{{ participant.days_remaining }}</span>
+                        {% elif participant.days_remaining >= 0 %}
+                            <span class="badge bg-warning text-dark rounded-pill fs-6">{{ participant.days_remaining }}</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill fs-6">{{ participant.days_remaining }}</span>
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Editable Form for AD/RO -->
+            {% if request.user.role in "AD RO" %}
+            <form method="post" action="{% url 'tracking:update_participant' participant.pk %}">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <!-- Left Column -->
+                    <div class="col-md-6">
+                        <div class="card border-success shadow-sm h-100">
+                            <div class="card-header bg-success text-white fw-bold">Monitor & CRF Status</div>
+                            <div class="card-body">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="monitor_downloaded"
+                                           {% if participant.monitor_downloaded %}checked{% endif %}>
+                                    <label class="form-check-label">Monitor Downloaded</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="ultrasound_downloaded"
+                                           {% if participant.ultrasound_downloaded %}checked{% endif %}>
+                                    <label class="form-check-label">Ultrasound Downloaded</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="case_report_form_uploaded"
+                                           {% if participant.case_report_form_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">CRF Uploaded</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="video_laryngoscope_uploaded"
+                                           {% if participant.video_laryngoscope_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">Video Laryngoscope</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="rop_final_report_uploaded"
+                                           {% if participant.rop_final_report_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">ROP Final Report</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column -->
+                    <div class="col-md-6">
+                        <div class="card border-warning shadow-sm h-100">
+                            <div class="card-header bg-warning text-dark fw-bold">More Uploads</div>
+                            <div class="card-body">
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="head_ultrasound_images_uploaded"
+                                           {% if participant.head_ultrasound_images_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">Head US Images</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="head_ultrasound_report_uploaded"
+                                           {% if participant.head_ultrasound_report_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">Head US Report</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="cost_effectiveness_data_uploaded"
+                                           {% if participant.cost_effectiveness_data_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">Cost-Effectiveness Data</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="blood_culture_done"
+                                           {% if participant.blood_culture_done %}checked{% endif %}>
+                                    <label class="form-check-label">Blood Culture Done</label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    <input class="form-check-input" type="checkbox" name="admission_notes_day1_uploaded"
+                                           {% if participant.admission_notes_day1_uploaded %}checked{% endif %}>
+                                    <label class="form-check-label">Notes Day 1</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save & Back Buttons -->
+                <div class="mt-4 d-flex justify-content-between">
+                    <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm">Save Updates</button>
+                    {% if request.user.role == "RO" %}
+                        <a href="{% url 'tracking:ro_dashboard' %}" class="btn btn-secondary btn-lg shadow-sm">
+                            <i class="bi bi-arrow-left"></i> Back to RO Dashboard
+                        </a>
+                    {% elif request.user.role == "AD" or request.user.is_superuser %}
+                        <a href="{% url 'tracking:choose_dashboard' %}" class="btn btn-secondary btn-lg shadow-sm">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    {% endif %}
+                </div>
+            </form>
+            {% else %}
+            <!-- Read-only view for other users -->
+            <div class="text-center text-muted mt-3">
+                You do not have permission to edit this participant's details.
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}

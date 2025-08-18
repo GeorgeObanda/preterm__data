@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Preterm Africa Dashboard{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+
+    <style>
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            padding-top: 65px;
+        }
+        nav.navbar {
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            padding: 0.4rem 1rem !important;
+        }
+        nav .navbar-brand {
+            font-weight: 700;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        nav .navbar-brand img { height: 32px; }
+        nav .nav-link { font-weight: 500; transition: color 0.2s ease, transform 0.2s ease; }
+        nav .nav-link:hover { color: #ffc107 !important; transform: translateY(-1px); }
+        .alert {
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+            margin-bottom: 1rem;
+        }
+        .content-wrapper {
+            max-width: 1200px;
+            margin: auto;
+            padding: 0 1rem 1rem 1rem;
+        }
+        footer {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: #fff;
+            padding: 1.5rem 0 1rem;
+        }
+        footer a { color: #ffc107; text-decoration: none; transition: color 0.2s ease; }
+        footer a:hover { color: #fff; }
+        footer hr { border-top: 1px solid rgba(255,255,255,0.3); }
+        .footer-social a { font-size: 1.2rem; margin-right: 0.5rem; }
+        #logout-warning {
+            display: none; position: fixed; bottom: 20px; right: 20px;
+            background: #dc3545; color: #fff; padding: 15px 20px;
+            border-radius: 10px; font-weight: bold; z-index: 9999;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg navbar-dark shadow-sm fixed-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'tracking:ra_dashboard' %}">
+            <img src="{% static 'images/logo.jpg' %}" alt="Logo" class="rounded-circle shadow-sm">
+            <span>Preterm Africa Dashboard</span>
+            <img src="{% static 'images/partner_logo.png' %}" alt="Partner Logo" class="rounded-circle shadow-sm">
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto align-items-center">
+                <li class="nav-item me-2">
+                    <a class="nav-link text-white fw-semibold" href="{% url 'tracking:blog' %}">Blog</a>
+                </li>
+                {% if user.is_authenticated %}
+                    <li class="nav-item me-2">
+                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ra_dashboard' %}">RA Dashboard</a>
+                    </li>
+                    <li class="nav-item me-2">
+                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ro_dashboard' %}">RO Dashboard</a>
+                    </li>
+                    <li class="nav-item me-3">
+                        <span class="navbar-text text-light">👋 {{ user.get_full_name|default:user.username }}</span>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-warning btn-sm px-3" href="{% url 'tracking:custom_logout_view' %}">Logout</a>
+                    </li>
+                {% else %}
+                    <li class="nav-item">
+                        <a class="btn btn-light btn-sm px-3" href="{% url 'tracking:ra_login' %}">Login</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- ALERTS -->
+<div class="container">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<!-- MAIN CONTENT WITH OPTIONAL BACK BUTTON -->
+<div class="content-wrapper">
+    {% block back_button %}
+        <div class="mb-3">
+            {% include "tracking/components/back_button.html" %}
+        </div>
+    {% endblock %}
+    {% block content %}{% endblock %}
+</div>
+
+<!-- FOOTER -->
+<footer>
+    <div class="container">
+        <div class="row text-center text-md-start">
+            <div class="col-md-4 mb-4">
+                <h5 class="fw-bold">Preterm Africa Dashboard</h5>
+                <p class="small">Improving preterm care through accurate data tracking and insightful dashboards.</p>
+            </div>
+            <div class="col-md-4 mb-4">
+                <h6 class="fw-bold">Quick Links</h6>
+                <ul class="list-unstyled">
+                    <li><a href="{% url 'tracking:ra_dashboard' %}">RA Dashboard</a></li>
+                    <li><a href="{% url 'tracking:ro_dashboard' %}">RO Dashboard</a></li>
+                    <li><a href="{% url 'tracking:blog' %}">Blog</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4 mb-4">
+                <h6 class="fw-bold">Contact</h6>
+                <p class="small mb-1">Email: <a href="mailto:support@pretermtracker.org">support@pretermtracker.org</a></p>
+                <p class="small mb-1">Phone: +254 700 000 000</p>
+                <div class="footer-social mt-2">
+                    <a href="#"><i class="bi bi-facebook"></i></a>
+                    <a href="#"><i class="bi bi-twitter"></i></a>
+                    <a href="#"><i class="bi bi-linkedin"></i></a>
+                </div>
+            </div>
+        </div>
+        <hr class="bg-white">
+        <div class="row">
+            <div class="col text-center small">&copy; {% now "Y" %} Preterm Africa Dashboard. All rights reserved</div>
+        </div>
+    </div>
+</footer>
+
+<!-- Logout warning -->
+<div id="logout-warning">
+    You will be logged out in <span id="countdown">10</span> seconds due to inactivity.
+</div>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{% if user.is_authenticated %}
+<script>
+(function () {
+  const WARN_AFTER_MS = 9*60*1000, LOGOUT_AFTER_MS = 10*60*1000;
+  let warnTimer, logoutTimer, countdownInterval, lastResetAt = Date.now();
+  const warningEl = document.getElementById('logout-warning'), countdownEl = document.getElementById('countdown');
+  const logoutUrl = "{% url 'tracking:custom_logout_view' %}";
+
+  function clearAllTimers() { if(warnTimer) clearTimeout(warnTimer); if(logoutTimer) clearTimeout(logoutTimer); if(countdownInterval) clearInterval(countdownInterval); }
+  function hideWarning() { if(warningEl) warningEl.style.display='none'; }
+  function showWarning() { if(warningEl && countdownEl) { warningEl.style.display='block'; startCountdown(); } }
+
+  function startCountdown() {
+    function secondsLeft() { return Math.ceil(Math.max(0, LOGOUT_AFTER_MS - (Date.now()-lastResetAt))/1000); }
+    countdownEl.textContent = secondsLeft();
+    countdownInterval = setInterval(()=>{ countdownEl.textContent = secondsLeft(); if(secondsLeft()<=0) clearInterval(countdownInterval); }, 1000);
+  }
+
+  function doLogout(){ window.location.href=logoutUrl; }
+  function startTimers(){ lastResetAt=Date.now(); clearAllTimers(); hideWarning(); warnTimer=setTimeout(showWarning,WARN_AFTER_MS); logoutTimer=setTimeout(doLogout,LOGOUT_AFTER_MS); }
+  function resetTimers(){ startTimers(); }
+
+  ['click','mousemove','mousedown','keydown','scroll','touchstart','wheel'].forEach(ev=>window.addEventListener(ev, resetTimers,{passive:true}));
+  document.addEventListener('visibilitychange',()=>{ if(!document.hidden) resetTimers(); });
+  startTimers();
+})();
+</script>
+{% endif %}
+</body>
+</html>

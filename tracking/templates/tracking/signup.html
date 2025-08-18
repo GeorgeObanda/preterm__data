@@ -1,0 +1,99 @@
+{% extends "tracking/base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+<style>
+  body {
+    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  .signup-card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    max-width: 420px;
+    width: 100%;
+    padding: 2.5rem 2rem;
+    transition: transform 0.3s ease;
+  }
+  .signup-card:hover { transform: translateY(-5px); }
+  .logo-top { height: 70px; margin-bottom: 1rem; }
+  h3 { font-weight: 700; color: #333; margin-bottom: 1.8rem; letter-spacing: 1px; }
+  label.form-label { font-weight: 600; color: #555; }
+  .form-control {
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    font-size: 1rem;
+    border: 1.8px solid #ddd;
+    transition: border-color 0.3s ease;
+    width: 100%;
+  }
+  .form-control:focus {
+    border-color: #6a11cb;
+    box-shadow: 0 0 8px rgba(106,17,203,0.3);
+  }
+  button.btn-primary {
+    background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 0.7rem 1.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    box-shadow: 0 4px 15px rgba(101,44,255,0.3);
+    transition: background 0.3s ease;
+  }
+  button.btn-primary:hover {
+    background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+  }
+  .logo-bottom { height: 40px; margin-top: 2rem; opacity: 0.6; }
+  .login-text { color: #444; font-size: 0.95rem; }
+  .login-text a { font-weight: 600; color: #2575fc; text-decoration: none; }
+  .login-text a:hover { text-decoration: underline; }
+  .errorlist { color: red; font-size: 0.85rem; margin-top: 0.25rem; }
+</style>
+
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 85vh;">
+  <div class="signup-card text-center">
+    <img src="{% static 'images/logo.jpg' %}" alt="Main Logo" class="logo-top mx-auto d-block">
+
+    <h3>Create an Account</h3>
+
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      {% for field in form %}
+        <div class="mb-3 text-start" id="field-{{ field.name }}">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field|add_class:"form-control" }}
+          {% if field.errors %}
+            <div class="errorlist">{{ field.errors|striptags }}</div>
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <button type="submit" class="btn btn-primary w-100">Sign Up</button>
+    </form>
+
+    <div class="mt-3 login-text">
+      Already have an account? <a href="{% url 'tracking:ra_login' %}">Login</a>
+    </div>
+
+    <img src="{% static 'images/partner_logo.png' %}" alt="Partner Logo" class="logo-bottom mx-auto d-block">
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const siteFieldWrapper = document.getElementById("field-site");
+    const siteSelect = siteFieldWrapper.querySelector("select");
+
+    // Show site field for all roles (except super admin, which cannot signup)
+    siteFieldWrapper.style.display = "block";
+    siteSelect.required = true;
+});
+</script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% if request and request.user.is_authenticated %}
+    {% if request.user.role == "AD" %}
+        <a href="{% url 'tracking:choose_dashboard' %}" class="btn btn-secondary mt-3">Back</a>
+    {% elif request.user.role == "RA" %}
+        <a href="{% url 'tracking:ra_dashboard' %}" class="btn btn-secondary mt-3">Back</a>
+    {% elif request.user.role == "RO" %}
+        <a href="{% url 'tracking:ro_dashboard' %}" class="btn btn-secondary mt-3">Back</a>
+    {% else %}
+        <a href="javascript:history.back()" class="btn btn-secondary mt-3">Back</a>
+    {% endif %}
+{% else %}
+    <a href="javascript:history.back()" class="btn btn-secondary mt-3">Back</a>
+{% endif %}

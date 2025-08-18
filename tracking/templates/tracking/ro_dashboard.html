@@ -1,0 +1,72 @@
+{% extends "tracking/base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Preterm Africa Patient Tracking Log {% if request.user.site %}({{ request.user.site.name }}){% else %}(All Sites){% endif %}</h2>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover align-middle text-center">
+            <thead class="table-dark">
+                <tr>
+                    <th class="text-start">Study ID</th>
+                    <th class="text-start">Enrollment Date</th>
+                    <th class="text-start">Due Date</th>
+                    <th>Days Remaining</th>
+                    <th>Monitor Data Download</th>
+                    <th>Ultrasound Data Download</th>
+                    <th>Head US Image</th>
+                    <th>Head US Report</th>
+                    <th>CRF Uploaded</th>
+                    <th>Video Laryspe</th>
+                    <th>ROP Final Report</th>
+                    <th>Cost-Effect</th>
+                    <th>Blood Culture Done</th>
+                    <th>Admin Notes Day 1</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in participants %}
+                <tr>
+                    <!-- Left-aligned columns -->
+                    <td class="text-start">
+                        <a href="{% url 'tracking:participant_detail' p.pk %}" class="text-decoration-none">
+                            {{ p.study_id }}
+                        </a>
+                    </td>
+                    <td class="text-start">{{ p.enrollment_date }}</td>
+                    <td class="text-start">{{ p.due_date }}</td>
+
+                    <!-- Center-aligned columns -->
+                    <td>
+                        <span class="badge rounded-pill px-3 py-2"
+                              style="background-color:
+                                  {% if p.days_remaining < 3 %}#dc3545
+                                  {% elif p.days_remaining < 5 %}#fd7e14
+                                  {% else %}#28a745
+                                  {% endif %};
+                                  color: white;">
+                            {{ p.days_remaining }}
+                        </span>
+                    </td>
+                    <td>{{ p.monitor_downloaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.ultrasound_downloaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.head_ultrasound_images_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.head_ultrasound_report_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.case_report_form_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.video_laryngoscope_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.rop_final_report_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.cost_effectiveness_data_uploaded|yesno:"✅,❌" }}</td>
+                    <td>{{ p.blood_culture_done|yesno:"✅,❌" }}</td>
+                    <td>{{ p.admission_notes_day1_uploaded|yesno:"✅,❌" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="14" class="text-center text-muted">No participants found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "tracking/components/back_button.html" %}
+</div>
+{% endblock %}
