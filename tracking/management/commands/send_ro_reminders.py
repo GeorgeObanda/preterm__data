@@ -1,116 +1,148 @@
 from django.core.management.base import BaseCommand
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
 from tracking.models import Participant, CustomUser
 
 
 class Command(BaseCommand):
-    help = "Send reminders for data downloads to ROs, RAs, Admins and escalate to PI if overdue"
+    help = 'Send grouped reminders for data downloads/uploads'
 
     def handle(self, *args, **kwargs):
-        reminders = {}   # {user: [(study_id, days_remaining, missing)]}
-        escalations = [] # [(study_id, overdue_days, missing)]
-
-        # Collect reminders and escalations
         participants = Participant.objects.all()
+
+        # Prepare grouped missing items per participant
+        reminders = {"due": [], "overdue": []}
+
         for p in participants:
             days = p.days_remaining()
-            missing = []
-            if not p.monitor_downloaded:
-                missing.append("Monitor")
-            if not p.ultrasound_done:
-                missing.append("Ultrasound")
-            missing_str = ", ".join(missing) if missing else "None"
 
-            if days in [2, 1, 0]:
-                # Send to RA, RO, Admin of this site
-                users = CustomUser.objects.filter(
-                    role__in=["RA", "RO", "Admin"], site=p.site, is_active=True
-                )
-                for u in users:
-                    reminders.setdefault(u, []).append((p.study_id, days, missing_str))
+            # Collect missing items
+            missing_items = []
+            checks = {
+                "Monitor Downloaded": p.monitor_downloaded,
+                "Ultrasound Downloaded": p.ultrasound_downloaded,
+                "Case Report Form": p.case_report_form_uploaded,
+                "Video Laryngoscope": p.video_laryngoscope_uploaded,
+                "ROP Final Report": p.rop_final_report_uploaded,
+                "Head US Images": p.head_ultrasound_images_uploaded,
+                "Head US Report": p.head_ultrasound_report_uploaded,
+                "Cost Effectiveness Data": p.cost_effectiveness_data_uploaded,
+                "Blood Culture": p.blood_culture_done,
+                "Admission Notes Day 1": p.admission_notes_day1_uploaded,
+            }
 
-            elif days < 0:
-                escalations.append((p.study_id, abs(days), missing_str))
+            for label, status in checks.items():
+                if not status:
+                    missing_items.append(label)
 
-        # --- Send reminders to RA, RO, Admin ---
-        for user, items in reminders.items():
-            subject = "Preterm Study Data Download Reminder"
-            text_message = "You have participants nearing data download deadlines:\n"
-            html_rows = ""
+            if not missing_items:
+                continue
 
-            for study_id, days, missing in items:
-                if days == 2:
-                    status = "Due in 2 days"
-                elif days == 1:
-                    status = "Due tomorrow"
-                elif days == 0:
-                    status = "DUE TODAY (URGENT)"
-                text_message += f"- {study_id}: {status}, Missing: {missing}\n"
-                html_rows += f"<tr><td>{study_id}</td><td>{status}</td><td>{missing}</td></tr>"
-
-            html_message = f"""
-            <p>Dear {user.username},</p>
-            <p>The following participants at <b>{user.site}</b> require your attention:</p>
-            <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
-                <tr style="background-color:#f2f2f2;">
-                    <th>Study ID</th>
-                    <th>Status</th>
-                    <th>Missing</th>
-                </tr>
-                {html_rows}
-            </table>
-            <p>Please log in to the system to take action:<br>
-            <a href="{settings.SITE_URL}/login">{settings.SITE_URL}/login</a></p>
+            # Build row: StudyID | all missing items | Days remaining
+            row = f"""
+            <tr>
+                <td>{p.study_id}</td>
+                <td>{', '.join(missing_items)}</td>
+                <td style="text-align:center;">{days if days >= 0 else 'Overdue'}</td>
+            </tr>
             """
 
-            send_mail(
-                subject,
-                text_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-                html_message=html_message,
-            )
+            if days in [2, 1, 0]:
+                reminders["due"].append((p.site, row, days))
+            elif days < 0:
+                reminders["overdue"].append((p.site, row, days))
 
-        # --- Escalation to PI (CC Admin) if overdue ---
-        if escalations:
-            pis = CustomUser.objects.filter(role="PI", is_active=True)
-            admins = CustomUser.objects.filter(role="Admin", is_active=True)
-
-            if pis.exists():
-                subject = "ESCALATION: Overdue Data Downloads in Preterm Study"
-                text_message = "The following participants are overdue:\n"
-                html_rows = ""
-
-                for study_id, overdue_days, missing in escalations:
-                    text_message += f"- {study_id}: overdue by {overdue_days} day(s), Missing: {missing}\n"
-                    html_rows += f"<tr><td>{study_id}</td><td>{overdue_days}</td><td>{missing}</td></tr>"
-
-                html_message = f"""
-                <p>Dear PI,</p>
-                <p>The following participants are <b>overdue</b> for data downloads:</p>
-                <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse;">
-                    <tr style="background-color:#f2f2f2;">
-                        <th>Study ID</th>
-                        <th>Days Overdue</th>
-                        <th>Missing</th>
+        # Function to format HTML table inside styled card
+        def build_html_table(rows, title, highlight_color):
+            return f"""
+            <div style="border:1px solid #ddd; border-radius:10px; padding:15px; 
+                        margin:20px 0; box-shadow:1px 2px 6px rgba(0,0,0,0.08);
+                        font-family:Arial, sans-serif; font-size:14px; color:#333;">
+                <h3 style="color:{highlight_color}; margin-top:0;">{title}</h3>
+                <table border="1" cellpadding="8" cellspacing="0" 
+                       style="border-collapse: collapse; width:100%; font-size:13px;">
+                    <tr style="background-color:#f9f9f9; text-align:left;">
+                        <th style="padding:8px;">Study ID</th>
+                        <th style="padding:8px;">Missing Items</th>
+                        <th style="padding:8px; text-align:center;">Days Remaining</th>
                     </tr>
-                    {html_rows}
+                    {''.join(rows)}
                 </table>
-                <p>Immediate action is required.</p>
-                """
+            </div>
+            """
 
-                recipient_list = list(pis.values_list("email", flat=True))
-                cc_list = list(admins.values_list("email", flat=True))
+        # Send Due reminders
+        if reminders["due"]:
+            for site in set(r[0] for r in reminders["due"]):
+                rows = [r[1] for r in reminders["due"] if r[0] == site]
+                days_list = [r[2] for r in reminders["due"] if r[0] == site]
+                subject = f"⚠️ Pending uploads due soon (D-{min(days_list)})"
+                table_html = build_html_table(rows, "Pending Uploads – Due Soon", "#f0ad4e")
 
-                send_mail(
-                    subject,
-                    text_message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    recipient_list + cc_list,  # PI + Admin together
-                    fail_silently=False,
-                    html_message=html_message,
+                recipients = CustomUser.objects.filter(
+                    role__in=['RO', 'RA', 'AD'], site=site, is_active=True
                 )
 
-        self.stdout.write(self.style.SUCCESS("Reminders and escalations sent successfully"))
+                for user in recipients:
+                    body_html = f"""
+                    <div style="font-family:Arial, sans-serif; color:#333; font-size:14px;">
+                        <p>Dear {user.username},</p>
+                        <p>The following uploads are still pending and need your attention:</p>
+                        {table_html}
+                        <p style="margin:20px 0;">
+                            <a href="https://preterm-data-tracker-9zcd.onrender.com"
+                               style="background-color:#0275d8; color:white; padding:10px 16px; 
+                                      border-radius:5px; text-decoration:none; font-weight:bold;">
+                                Login to Update
+                            </a>
+                        </p>
+                        <p>Best regards,<br>
+                        <strong>Preterm Baby Tracker System</strong></p>
+                    </div>
+                    """
+
+                    msg = EmailMultiAlternatives(
+                        subject,
+                        body_html,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [user.email],
+                    )
+                    msg.attach_alternative(body_html, "text/html")
+                    msg.send()
+
+        # Send Overdue reminders
+        if reminders["overdue"]:
+            rows = [r[1] for r in reminders["overdue"]]
+            subject = "🚨 Overdue uploads – Immediate Action Required"
+            table_html = build_html_table(rows, "Overdue Uploads", "#d9534f")
+
+            recipients = CustomUser.objects.filter(role='AD', is_active=True)
+
+            for user in recipients:
+                body_html = f"""
+                <div style="font-family:Arial, sans-serif; color:#333; font-size:14px;">
+                    <p>Dear {user.username},</p>
+                    <p>The following uploads are <b style="color:#d9534f;">overdue</b>:</p>
+                    {table_html}
+                    <p style="margin:20px 0;">
+                        <a href="https://preterm-data-tracker-9zcd.onrender.com"
+                           style="background-color:#d9534f; color:white; padding:10px 16px; 
+                                  border-radius:5px; text-decoration:none; font-weight:bold;">
+                            Follow Up Now
+                        </a>
+                    </p>
+                    <p>Best regards,<br>
+                    <strong>Preterm Baby Tracker System</strong></p>
+                </div>
+                """
+
+                msg = EmailMultiAlternatives(
+                    subject,
+                    body_html,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                )
+                msg.attach_alternative(body_html, "text/html")
+                msg.send()
+
+        self.stdout.write(self.style.SUCCESS("Grouped reminders sent successfully"))
