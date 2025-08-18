@@ -25,6 +25,7 @@ AUTH_USER_MODEL = 'tracking.CustomUser'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # ✅ Added for static files
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -78,8 +79,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"             # Where collectstatic will ga
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Session management
 SESSION_COOKIE_AGE = 600          # 10 minutes
-SESSION_SAVE_EVERY_REQUEST = True  # sliding expiry based on activity
+SESSION_SAVE_EVERY_REQUEST = True  # Sliding expiry based on activity
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
@@ -95,5 +97,5 @@ CRONJOBS = [
     ('0 10 * * *', 'django.core.management.call_command', ['send_ro_reminders'])
 ]
 
-# Add this line to let WhiteNoise handle static files properly
+# WhiteNoise static files storage
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
