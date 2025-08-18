@@ -5,7 +5,7 @@ app_name = 'tracking'
 
 urlpatterns = [
     # Home & Blog
-    path('', views.index, name='index'),  # root URL
+    path('', views.blog, name='blog'),  # root URL
     path('blog/', views.blog, name='blog'),
 
     # Authentication
