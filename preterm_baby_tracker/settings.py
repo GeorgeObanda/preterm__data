@@ -94,3 +94,6 @@ DEFAULT_FROM_EMAIL = 'barnes.okoth@gmail.com'
 CRONJOBS = [
     ('0 10 * * *', 'django.core.management.call_command', ['send_ro_reminders'])
 ]
+
+# Add this line to let WhiteNoise handle static files properly
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
