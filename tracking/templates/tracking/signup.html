@@ -7,7 +7,8 @@
 {% block content %}
 <style>
   body {
-    background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    background-attachment: fixed;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
   .signup-card {
@@ -32,8 +33,8 @@
     width: 100%;
   }
   .form-control:focus {
-    border-color: #6a11cb;
-    box-shadow: 0 0 8px rgba(106,17,203,0.3);
+    border-color: #2575fc;
+    box-shadow: 0 0 8px rgba(37,117,252,0.3);
   }
   button.btn-primary {
     background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
@@ -68,7 +69,13 @@
       {% for field in form %}
         <div class="mb-3 text-start" id="field-{{ field.name }}">
           <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field|add_class:"form-control" }}
+
+          {% if field.name == "role" or field.name == "site" %}
+            {{ field|add_class:"form-control" }}
+          {% else %}
+            {{ field|add_class:"form-control" }}
+          {% endif %}
+
           {% if field.errors %}
             <div class="errorlist">{{ field.errors|striptags }}</div>
           {% endif %}
@@ -88,12 +95,29 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    const siteFieldWrapper = document.getElementById("field-site");
-    const siteSelect = siteFieldWrapper.querySelector("select");
+    // Role field
+    const roleFieldWrapper = document.getElementById("field-role");
+    const roleSelect = roleFieldWrapper ? roleFieldWrapper.querySelector("select") : null;
+    if (roleSelect) {
+      const placeholder = document.createElement("option");
+      placeholder.text = "Please select your role";
+      placeholder.value = "";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      roleSelect.insertBefore(placeholder, roleSelect.firstChild);
+    }
 
-    // Show site field for all roles (except super admin, which cannot signup)
-    siteFieldWrapper.style.display = "block";
-    siteSelect.required = true;
+    // Site field
+    const siteFieldWrapper = document.getElementById("field-site");
+    const siteSelect = siteFieldWrapper ? siteFieldWrapper.querySelector("select") : null;
+    if (siteSelect) {
+      const placeholder = document.createElement("option");
+      placeholder.text = "Please select your site";
+      placeholder.value = "";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      siteSelect.insertBefore(placeholder, siteSelect.firstChild);
+    }
 });
 </script>
 {% endblock %}

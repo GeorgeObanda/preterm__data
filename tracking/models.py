@@ -19,7 +19,6 @@ class Site(models.Model):
 # -----------------------
 class CustomUser(AbstractUser):
     ROLE_CHOICES = (
-        ('','Select your role'),
         ('RA', 'Research Assistant'),
         ('RO', 'Research Officer'),
         ('AD', 'PI'),

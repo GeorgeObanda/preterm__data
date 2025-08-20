@@ -110,8 +110,7 @@ class SignupForm(UserCreationForm):
     site = forms.ModelChoiceField(
         queryset=Site.objects.all(),
         widget=forms.Select(attrs={'class': 'form-control'}),
-        required=True,
-        empty_label="Select Site"
+        required=True
     )
 
     class Meta:

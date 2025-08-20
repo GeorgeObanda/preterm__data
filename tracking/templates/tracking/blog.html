@@ -3,8 +3,11 @@
 
 {% block content %}
 <style>
+/* GENERAL PAGE STYLES */
 body {
     padding-top: 65px;
+    background: #f9fafb;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 /* HEADER */
@@ -14,10 +17,11 @@ body {
 }
 .page-header h2 {
     font-weight: 700;
-    color: #007bff;
+    color: #0d6efd;
 }
 .page-header p {
     color: #6c757d;
+    font-size: 1rem;
 }
 
 /* SLIDESHOW */
@@ -26,7 +30,8 @@ body {
     width: 100%;
     overflow: hidden;
     border-radius: 15px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    margin-bottom: 1.5rem;
 }
 .slides {
     display: flex;
@@ -38,115 +43,124 @@ body {
 }
 .slide img {
     width: 100%;
-    height: auto; /* keep full aspect ratio */
+    height: auto;
     display: block;
+    border-radius: 15px;
 }
 
-/* Overlay */
+/* Overlay effect for text focus */
 .slideshow-container::before {
     content: "";
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    background: rgba(0, 0, 0, 0.45);
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
     z-index: 1;
     pointer-events: none;
 }
 
 /* FEATURE CARD */
 .feature-card {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 20px;
+    background: #fff;
+    border-radius: 16px;
     padding: 2rem 2.5rem;
-    color: #222;
+    color: #333;
     text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     font-size: 1.05rem;
     line-height: 1.5;
-    transition: opacity 0.8s ease-in-out;
+    transition: opacity 0.6s ease-in-out, transform 0.3s ease;
     cursor: pointer;
-    margin-bottom: 1.5rem;
+    margin: 1rem auto;
+    max-width: 750px;
+}
+.feature-card:hover {
+    transform: translateY(-5px);
 }
 .feature-card i {
-    font-size: 2.5rem;
+    font-size: 2.4rem;
     margin-bottom: 0.6rem;
-    color: #007bff;
+    color: #0d6efd;
 }
 .feature-card h4 {
     font-weight: 700;
     margin-bottom: 0.5rem;
-    font-size: 1.3rem;
+    font-size: 1.25rem;
 }
 .feature-card p {
-    font-size: 1.05rem;
+    font-size: 1rem;
+    color: #555;
 }
 
-/* ARROWS */
+/* NAVIGATION ARROWS */
 .prev, .next {
     cursor: pointer;
     position: absolute;
     top: 50%;
-    padding: 10px;
-    margin-top: -20px;
+    padding: 12px;
+    margin-top: -22px;
     color: white;
     font-weight: bold;
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     background: rgba(0,0,0,0.4);
     border-radius: 50%;
     user-select: none;
     z-index: 3;
+    transition: background 0.3s ease;
 }
 .prev:hover, .next:hover {
     background: rgba(0,0,0,0.7);
 }
-.prev { left: 10px; }
-.next { right: 10px; }
+.prev { left: 12px; }
+.next { right: 12px; }
 
 /* DOTS */
 .dots-container {
     text-align: center;
     position: absolute;
-    bottom: 10px;
+    bottom: 12px;
     width: 100%;
     z-index: 3;
 }
 .dot {
     cursor: pointer;
-    height: 10px;
-    width: 10px;
+    height: 11px;
+    width: 11px;
     margin: 0 4px;
     background-color: rgba(255,255,255,0.6);
     border-radius: 50%;
     display: inline-block;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease;
 }
-.dot.active {
-    background-color: #007bff;
+.dot.active, .dot:hover {
+    background-color: #0d6efd;
+    transform: scale(1.2);
 }
 
 /* RESPONSIVE */
 @media (max-width: 768px) {
     .feature-card { padding: 1.5rem; }
+    .feature-card h4 { font-size: 1.1rem; }
 }
 </style>
 
-<div class="container my-3">
+<div class="container my-4">
     <!-- HEADER -->
     <div class="page-header">
         <h2>📚 Preterm Africa Study Highlights</h2>
+        <p class="lead">Key insights into neonatal care, CPAP interventions, and survival outcomes</p>
     </div>
 
-    <!-- FEATURE CARD (now before description) -->
+    <!-- FEATURE CARD -->
     <div class="feature-card" id="feature-card"></div>
-    <button id="continueBtn" class="btn btn-primary mt-3" style="display:none;">Continue</button>
+    <div class="text-center">
+        <button id="continueBtn" class="btn btn-primary mt-3" style="display:none;">Continue</button>
+    </div>
 
     <!-- SLIDESHOW -->
     <div class="slideshow-container">
         <div class="slides" id="slides"></div>
-
         <a class="prev" onclick="changeSlide(-1)">❮</a>
         <a class="next" onclick="changeSlide(1)">❯</a>
-
         <div class="dots-container" id="dots-container"></div>
     </div>
 </div>
@@ -212,7 +226,7 @@ function updateSlide() {
             <p>${highlight.desc}</p>
         `;
         featureCard.style.opacity = 1;
-    }, 300);
+    }, 250);
     dots.forEach((dot, idx) => dot.classList.toggle('active', idx === currentIndex));
 }
 
@@ -242,7 +256,7 @@ function resetAutoSlide() {
     startAutoSlide();
 }
 
-// Pause & Continue
+// Pause on click
 featureCard.addEventListener('click', () => {
     isPaused = true;
     continueBtn.style.display = 'inline-block';
