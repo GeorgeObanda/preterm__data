@@ -48,17 +48,52 @@ class ScreeningSessionAdmin(admin.ModelAdmin):
     list_filter = ('ra', 'site', 'date')
     search_fields = ('ra__username', 'site__name')
 
+
 # -----------------------
 # Participant Admin
 # -----------------------
 @admin.register(Participant)
 class ParticipantAdmin(admin.ModelAdmin):
+    # Columns to display in the list view
     list_display = (
-        'study_id', 'site', 'enrollment_date', 'due_date', 'date_of_birth',
-        'screening_session', 'monitor_downloaded', 'ultrasound_downloaded', 'is_completed'
+        "study_id",
+        "site",
+        "date_of_birth",
+        "enrollment_date",
+        "due_date",
+        "number_screened",      # ✅ captured directly on Participant
+        "number_eligible",      # ✅ captured directly on Participant
+        "monitor_downloaded",
+        "ultrasound_downloaded",
+        "is_completed_display",  # ✅ wrapper instead of raw method
     )
-    list_filter = ('site', 'monitor_downloaded', 'ultrasound_downloaded', 'screening_session__date')
-    search_fields = ('study_id', 'screening_session__ra__username')
+
+    # Sidebar filters
+    list_filter = (
+        "site",
+        "monitor_downloaded",
+        "ultrasound_downloaded",
+        "enrollment_date",
+    )
+
+    # Searchable fields
+    search_fields = ("study_id",)
+
+    # Editable fields directly in list view (⚡ removed is_completed — not a DB field)
+    list_editable = (
+        "number_screened",
+        "number_eligible",
+        "monitor_downloaded",
+        "ultrasound_downloaded",
+    )
+
+    # Default ordering
+    ordering = ("-enrollment_date",)
+
+    @admin.display(boolean=True, description="Completed")
+    def is_completed_display(self, obj):
+        return obj.is_completed()
+
 
 # -----------------------
 # Notification Log Admin

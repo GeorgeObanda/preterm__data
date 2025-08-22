@@ -3,13 +3,14 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from .models import Participant, Site
+from .models import Participant, Site,ScreeningSession
 
 User = get_user_model()
 
 
 # ---------- Participant Forms ----------
 class ParticipantForm(forms.ModelForm):
+    # 3-digit suffix; we'll compose full study_id with site code
     study_id = forms.CharField(
         max_length=3,
         validators=[RegexValidator(r'^\d{3}$', 'Enter exactly 3 digits')],
@@ -30,18 +31,33 @@ class ParticipantForm(forms.ModelForm):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
 
+    class Meta:
+        model = Participant
+        fields = [
+            'study_id',
+            'date_of_birth',
+            'enrollment_date',
+            'site',
+            'number_screened',     # ✅ captured on Participant
+            'number_eligible',     # ✅ captured on Participant
+        ]
+        widgets = {
+            'number_screened': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+            'number_eligible': forms.NumberInput(attrs={'class': 'form-control', 'min': 0}),
+        }
+
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        if self.user:
-            if self.user.role == 'RA':
-                # RA: auto-assign site, hide site field
-                self.fields.pop('site', None)
-            elif self.user.role in ['AD', 'RO']:
-                self.fields['site'].required = True
-            else:
-                self.fields.pop('site', None)
+        # RA users: auto-assign site and hide site field
+        if self.user and getattr(self.user, 'role', None) == 'RA':
+            self.fields.pop('site', None)
+        elif self.user and self.user.role in ['AD', 'RO']:
+            self.fields['site'].required = True
+        else:
+            # Fallback: if role unknown, still allow site to be chosen
+            pass
 
     def clean_study_id(self):
         number_part = self.cleaned_data.get('study_id')
@@ -61,15 +77,15 @@ class ParticipantForm(forms.ModelForm):
 
     def save(self, commit=True):
         participant = super().save(commit=False)
-        if self.user and self.user.role == 'RA':
+
+        # Ensure site saved for RA
+        if self.user and getattr(self.user, 'role', None) == 'RA':
             participant.site = self.user.site
+
         if commit:
             participant.save()
         return participant
 
-    class Meta:
-        model = Participant
-        fields = ['study_id', 'date_of_birth', 'enrollment_date', 'site']
 
 class ParticipantUpdateForm(forms.ModelForm):
     """Used by RO/Admin to update participant upload/checklist status."""

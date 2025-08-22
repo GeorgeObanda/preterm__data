@@ -14,6 +14,8 @@ from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
 from django.db.models import Q
+from django.db.models import Sum
+from datetime import datetime
 
 from .models import Participant, ScreeningSession
 from .forms import ParticipantForm, SignupForm
@@ -240,7 +242,7 @@ def auto_logout_view(request):
 @login_required
 def choose_dashboard(request):
     # Allow access if user is AD (PI) or superuser
-    if request.user.role != 'AD' and not request.user.is_superuser:
+    if request.user.role not in ['AD', 'RO'] and not request.user.is_superuser:
         return render(
             request,
             'tracking/forbidden.html',
@@ -256,13 +258,17 @@ def choose_dashboard(request):
     pending = pending_participants(participants)
     completed = completed_participants(participants)
 
+    # Total number screened (sum of number_screened column)
+    number_screened = participants.aggregate(total_screened=Sum('number_screened'))['total_screened'] or 0
+
     return render(
         request,
         'tracking/choose_dashboard.html',
         {
             'participants': participants,
             'pending': pending,
-            'completed': completed
+            'completed': completed,
+            'number_screened': number_screened
         }
     )
 @login_required(login_url=reverse_lazy('tracking:ra_login'))
@@ -297,49 +303,24 @@ def ro_dashboard(request):
 
 
 # ---------------------- Participant Management ----------------------
+@login_required
 def register_participant(request):
-    # Get or create today's screening session for this RA
-    today = timezone.localdate()
-    session, created = ScreeningSession.objects.get_or_create(
-        ra=request.user,
-        site=request.user.site,
-        date=today,
-        defaults={'number_screened': 0, 'number_eligible': 0}
-    )
-
     if request.method == "POST":
         form = ParticipantForm(request.POST, user=request.user)
         if form.is_valid():
-            participant = form.save(commit=False)
-            participant.screening_session = session  # link participant to session
-            participant.save()
-
-            # Increment counter for how many participants have been registered
-            registered_count = Participant.objects.filter(screening_session=session).count()
-            remaining = session.number_eligible - registered_count
-
-            if remaining > 0:
-                messages.info(request, f"Participant registered! {remaining} more eligible participant(s) remaining to enter.")
-                return redirect('tracking:register_participant')  # reload form for next entry
-            else:
-                messages.success(request, "All eligible participants for today have been registered.")
-                return redirect('tracking:ra_dashboard')
+            participant = form.save()
+            messages.success(
+                request,
+                f"Participant {participant.study_id} saved. "
+                f"Screened: {participant.number_screened}, Eligible: {participant.number_eligible}."
+            )
+            return redirect('tracking:register_participant')
         else:
             messages.error(request, "Please correct the errors below.")
     else:
         form = ParticipantForm(user=request.user)
 
-    # Show how many participants remain to register
-    registered_count = Participant.objects.filter(screening_session=session).count()
-    remaining = max(session.number_eligible - registered_count, 0)
-
-    context = {
-        'form': form,
-        'screening_session': session,
-        'remaining_to_register': remaining
-    }
-    return render(request, 'tracking/register_participant.html', context)
-
+    return render(request, 'tracking/register_participant.html', {"form": form})
 @login_required
 def participant_detail(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
@@ -352,30 +333,49 @@ def participant_detail(request, pk):
 @login_required
 def update_participant(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
-    if not request.user.is_superuser and (request.user.role not in ('RO', 'AD') or participant.site != request.user.site):
-        return render(request, 'tracking/forbidden.html', {'message': "You can only modify participants from your site."})
+
+    # Permission check: RA, RO, AD, or superuser can update
+    if request.user.role not in ('RA', 'RO', 'AD') and not request.user.is_superuser:
+        return render(request, 'tracking/forbidden.html', {
+            'message': "You do not have permission to update this participant."
+        })
+
+    # Optional: Ensure RA/RO/AD can only update participants from their site
+    if request.user.role in ('RA', 'RO', 'AD') and not request.user.is_superuser:
+        if participant.site != request.user.site:
+            return render(request, 'tracking/forbidden.html', {
+                'message': "Access Denied. Participant does not belong to your site."
+            })
 
     if request.method == "POST":
-        checkbox_fields = [
-            'monitor_downloaded', 'ultrasound_downloaded', 'case_report_form_uploaded',
-            'video_laryngoscope_uploaded', 'rop_final_report_uploaded',
-            'head_ultrasound_images_uploaded', 'head_ultrasound_report_uploaded',
-            'cost_effectiveness_data_uploaded', 'blood_culture_done',
-            'admission_notes_day1_uploaded', 'rop_screening_done'
-        ]
-        for field in checkbox_fields:
-            setattr(participant, field, field in request.POST)
+        # Get form data
+        study_id = request.POST.get("study_id")
+        dob = request.POST.get("date_of_birth")
+        enrollment = request.POST.get("enrollment_date")
+
+        # Update fields if provided
+        if study_id:
+            participant.study_id = study_id
+        if dob:
+            participant.date_of_birth = dob
+        if enrollment:
+            participant.enrollment_date = enrollment
+
         participant.save()
         messages.success(request, f"Participant {participant.study_id} updated successfully.")
 
+        # Redirect based on role
         if request.user.role == "RO":
             return redirect('tracking:ro_dashboard')
-        elif request.user.role == "AD":
+        elif request.user.role == "AD" or request.user.is_superuser:
             return redirect('tracking:choose_dashboard')
         else:
             return redirect('tracking:ra_dashboard')
 
+    # If GET, redirect to participant detail
     return redirect('tracking:participant_detail', pk=participant.pk)
+
+
 
 
 # ---------------------- Quick Mark Actions ----------------------
@@ -512,42 +512,80 @@ def participant_detail(request, pk):
     can_edit = request.user.role in ['AD', 'RO'] or request.user.is_superuser
     return render(request, 'tracking/participant_detail.html', {'participant': participant, 'can_edit': can_edit})
 
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from tracking.models import Participant
+
 @login_required
 def update_participant(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
 
-    # Permission check: only superusers, RO, or AD users from the same site can update
-    if not request.user.is_superuser and (request.user.role not in ('RO', 'AD') or participant.site != request.user.site):
-        return render(request, 'tracking/forbidden.html', {
-            'message': "You can only modify participants from your site."
-        })
+    # RA: only participants from their site
+    if request.user.role == 'RA' and participant.site != request.user.site:
+        messages.error(request, "Access Denied. You can only modify participants from your site.")
+        return redirect('tracking:ra_dashboard')
+
+    # Block anyone else not allowed
+    if request.user.role not in ('RA', 'RO', 'AD') and not request.user.is_superuser:
+        messages.error(request, "You do not have permission to update this participant.")
+        return redirect('tracking:ra_dashboard')
 
     if request.method == "POST":
-        # Update all checkbox fields
-        checkbox_fields = [
-            'monitor_downloaded', 'ultrasound_downloaded', 'case_report_form_uploaded',
-            'video_laryngoscope_uploaded', 'rop_final_report_uploaded',
-            'head_ultrasound_images_uploaded', 'head_ultrasound_report_uploaded',
-            'cost_effectiveness_data_uploaded', 'blood_culture_done',
-            'admission_notes_day1_uploaded', 'rop_screening_done'
-        ]
-        for field in checkbox_fields:
-            setattr(participant, field, field in request.POST)
+        # --- Editable Fields ---
+
+        # Study ID
+        study_id = request.POST.get("study_id")
+        if study_id is not None:
+            participant.study_id = study_id.strip()
+
+        # Date of Birth
+        dob_str = request.POST.get("date_of_birth")
+        if dob_str:
+            try:
+                participant.date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
+            except ValueError:
+                messages.warning(request, "Invalid Date of Birth format. Use YYYY-MM-DD.")
+
+        # Enrollment Date
+        enrollment_str = request.POST.get("enrollment_date")
+        if enrollment_str:
+            try:
+                participant.enrollment_date = datetime.strptime(enrollment_str, "%Y-%m-%d").date()
+            except ValueError:
+                messages.warning(request, "Invalid Enrollment Date format. Use YYYY-MM-DD.")
+
+        # --- Checkboxes (for RO, AD, superuser) ---
+        # RAs do not update checkboxes
+        if request.user.role in ("RO", "AD") or request.user.is_superuser:
+            checkbox_fields = [
+                "monitor_downloaded",
+                "ultrasound_downloaded",
+                "case_report_form_uploaded",
+                "video_laryngoscope_uploaded",
+                "rop_final_report_uploaded",
+                "head_ultrasound_images_uploaded",
+                "head_ultrasound_report_uploaded",
+                "cost_effectiveness_data_uploaded",
+                "blood_culture_done",
+                "admission_notes_day1_uploaded",
+            ]
+            for field in checkbox_fields:
+                setattr(participant, field, field in request.POST)
 
         participant.save()
         messages.success(request, f"Participant {participant.study_id} updated successfully.")
 
-        # Redirect based on user role
-        if request.user.role == "RO":
-            return redirect('tracking:ro_dashboard')
-        elif request.user.role == "AD":
-            return redirect('tracking:choose_dashboard')
-        else:
+        # Redirect based on role
+        if request.user.role == "RA":
             return redirect('tracking:ra_dashboard')
+        elif request.user.role == "RO":
+            return redirect('tracking:ro_dashboard')
+        elif request.user.role in ("AD",) or request.user.is_superuser:
+            return redirect('tracking:choose_dashboard')
 
-    # If accessed without POST, redirect to participant detail
+    # GET requests redirect to participant detail page
     return redirect('tracking:participant_detail', pk=participant.pk)
-
 
 # ---------- Quick Mark Actions ----------
 

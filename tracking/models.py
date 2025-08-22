@@ -104,6 +104,12 @@ class Participant(models.Model):
         blank=True,  # allow empty for older participants
     )
 
+    # -----------------------
+    # New Direct Fields
+    # -----------------------
+    number_screened = models.IntegerField(default=0)
+    number_eligible = models.IntegerField(default=0)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

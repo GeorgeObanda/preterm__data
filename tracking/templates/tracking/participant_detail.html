@@ -20,13 +20,16 @@
                         Site: <span class="text-secondary">{{ participant.site.name }}</span>
                     </li>
                     <li class="list-group-item d-flex justify-content-between">
+                        Date of Birth: <span class="text-secondary">{{ participant.date_of_birth|date:"F j, Y" }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between">
                         Enrollment Date: <span class="text-secondary">{{ participant.enrollment_date|date:"F j, Y" }}</span>
                     </li>
                     <li class="list-group-item d-flex justify-content-between">
                         Due Date: <span class="text-secondary">{{ participant.due_date|date:"F j, Y" }}</span>
                     </li>
                     <li class="list-group-item text-center">
-                        Days Remaining for data download and Upload:
+                        Days Remaining for data download and upload:
                         {% if participant.days_remaining > 3 %}
                             <span class="badge bg-success rounded-pill fs-6">{{ participant.days_remaining }}</span>
                         {% elif participant.days_remaining >= 0 %}
@@ -38,12 +41,38 @@
                 </ul>
             </div>
 
-            <!-- Editable Form for AD/RO -->
-            {% if request.user.role in "AD RO" %}
+            {% if request.user.role in "RA RO AD" or request.user.is_superuser %}
             <form method="post" action="{% url 'tracking:update_participant' participant.pk %}">
                 {% csrf_token %}
-                <div class="row g-3">
-                    <!-- Left Column -->
+
+                <!-- Enable editing checkbox -->
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="enableEdit">
+                    <label class="form-check-label fw-bold" for="enableEdit">Do you want to Edit Basic Information?</label>
+                </div>
+
+                <!-- Editable Fields for Study ID, DOB, Enrollment Date -->
+                <div id="editableFields" style="display: none;">
+                    <div class="mb-3">
+                        <label for="study_id" class="form-label fw-semibold">Study ID</label>
+                        <input type="text" class="form-control" name="study_id" id="study_id"
+                               value="{{ participant.study_id }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="dob" class="form-label fw-semibold">Date of Birth</label>
+                        <input type="date" class="form-control" name="date_of_birth" id="dob"
+                               value="{{ participant.date_of_birth|date:'Y-m-d' }}">
+                    </div>
+                    <div class="mb-3">
+                        <label for="enrollment_date" class="form-label fw-semibold">Enrollment Date</label>
+                        <input type="date" class="form-control" name="enrollment_date" id="enrollment_date"
+                               value="{{ participant.enrollment_date|date:'Y-m-d' }}">
+                    </div>
+                </div>
+
+                <!-- Checkboxes (only for RO, AD, Superuser) -->
+                {% if request.user.role in "RO AD" or request.user.is_superuser %}
+                <div class="row g-3 mb-4">
                     <div class="col-md-6">
                         <div class="card border-success shadow-sm h-100">
                             <div class="card-header bg-success text-white fw-bold">Monitor & CRF Status</div>
@@ -76,8 +105,6 @@
                             </div>
                         </div>
                     </div>
-
-                    <!-- Right Column -->
                     <div class="col-md-6">
                         <div class="card border-warning shadow-sm h-100">
                             <div class="card-header bg-warning text-dark fw-bold">More Uploads</div>
@@ -111,15 +138,21 @@
                         </div>
                     </div>
                 </div>
+                {% endif %}
 
-                <!-- Save & Back Buttons -->
                 <div class="mt-4 d-flex justify-content-between">
-                    <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm">Save Updates</button>
-                    {% if request.user.role == "RO" %}
+                    <button type="submit" class="btn btn-success btn-lg px-5 shadow-sm">
+                        Save Updates
+                    </button>
+                    {% if request.user.role == "RA" %}
+                        <a href="{% url 'tracking:ra_dashboard' %}" class="btn btn-secondary btn-lg shadow-sm">
+                            <i class="bi bi-arrow-left"></i> Back to RA Dashboard
+                        </a>
+                    {% elif request.user.role == "RO" %}
                         <a href="{% url 'tracking:ro_dashboard' %}" class="btn btn-secondary btn-lg shadow-sm">
                             <i class="bi bi-arrow-left"></i> Back to RO Dashboard
                         </a>
-                    {% elif request.user.role == "AD" or request.user.is_superuser %}
+                    {% elif request.user.role in "AD" or request.user.is_superuser %}
                         <a href="{% url 'tracking:choose_dashboard' %}" class="btn btn-secondary btn-lg shadow-sm">
                             <i class="bi bi-arrow-left"></i> Back to Dashboard
                         </a>
@@ -127,13 +160,23 @@
                 </div>
             </form>
             {% else %}
-            <!-- Read-only view for other users -->
             <div class="text-center text-muted mt-3">
-<!--                You do not have permission to edit this participant's details.-->
+                You do not have permission to edit this participant's details.
             </div>
             {% endif %}
 
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const checkbox = document.getElementById("enableEdit");
+    const editableFields = document.getElementById("editableFields");
+
+    checkbox?.addEventListener("change", function() {
+        editableFields.style.display = this.checked ? "block" : "none";
+    });
+});
+</script>
 {% endblock %}

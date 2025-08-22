@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Preterm Africa Dashboard{% endblock %}</title>
+    <title>{% block title %}Preterm Africa Study{% endblock %}</title>
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -36,7 +36,7 @@
     <div class="container-fluid">
         <a class="navbar-brand" href="{% url 'tracking:ra_dashboard' %}">
             <img src="{% static 'images/logo.jpg' %}" alt="Logo" class="rounded-circle shadow-sm">
-            <span>Preterm Africa Dashboard</span>
+            <span>Preterm Africa Study</span>
             <img src="{% static 'images/partner_logo.png' %}" alt="Partner Logo" class="rounded-circle shadow-sm">
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -102,7 +102,7 @@
     <div class="container">
         <div class="row text-center text-md-start">
             <div class="col-md-4 mb-4">
-                <h5 class="fw-bold">Preterm Africa Dashboard</h5>
+                <h5 class="fw-bold">Preterm Africa Study</h5>
                 <p class="small">Improving preterm care through accurate data tracking and insightful dashboards.</p>
             </div>
             <div class="col-md-4 mb-4">
@@ -127,7 +127,7 @@
         </div>
         <hr class="bg-white">
         <div class="row">
-            <div class="col text-center small">&copy; {% now "Y" %} Preterm Africa Dashboard. All rights reserved</div>
+            <div class="col text-center small">&copy; {% now "Y" %} Preterm Africa Study. All rights reserved</div>
         </div>
     </div>
 </footer>

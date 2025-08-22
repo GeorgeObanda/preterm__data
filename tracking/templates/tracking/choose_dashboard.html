@@ -7,9 +7,17 @@
   <!-- Summary Cards -->
   <div class="row mb-5 g-4">
     <div class="col-md-3">
+      <div class="card text-white bg-primary shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Screened</h5>
+          <p class="card-text fs-3">{{ number_screened }}</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
       <div class="card text-white bg-success shadow-sm">
         <div class="card-body">
-          <h5 class="card-title">Participants</h5>
+          <h5 class="card-title">Eligible</h5>
           <p class="card-text fs-3">{{ participants|length }}</p>
         </div>
       </div>
@@ -17,7 +25,7 @@
     <div class="col-md-3">
       <div class="card text-white bg-warning shadow-sm">
         <div class="card-body">
-          <h5 class="card-title">Pending</h5>
+          <h5 class="card-title">Pending Upload</h5>
           <p class="card-text fs-3">{{ pending|length }}</p>
         </div>
       </div>
