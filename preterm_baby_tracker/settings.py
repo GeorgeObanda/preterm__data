@@ -103,7 +103,7 @@ EMAIL_USE_TLS = True
 EMAIL_PORT = 587
 EMAIL_HOST_USER = 'barnes.okoth@gmail.com'
 EMAIL_HOST_PASSWORD = 'ljet xecf wnns wxtk'  # Gmail App Password
-DEFAULT_FROM_EMAIL = 'barnes.okoth@gmail.com'
+DEFAULT_FROM_EMAIL = 'George Obanda <barnes.okoth@gmail.com>'
 
 # Cron jobs for reminders (run every day at 10 AM Nairobi time)
 CRONJOBS = [
