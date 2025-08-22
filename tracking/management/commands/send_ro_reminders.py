@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.core.mail import EmailMultiAlternatives
 from django.conf import settings
-from tracking.models import Participant, CustomUser
+from tracking.models import Participant, CustomUser, NotificationLog
 
 
 class Command(BaseCommand):
@@ -9,140 +9,136 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         participants = Participant.objects.all()
-
-        # Prepare grouped missing items per participant
         reminders = {"due": [], "overdue": []}
 
+        # Fetch active superusers
+        superusers = list(CustomUser.objects.filter(is_superuser=True, is_active=True))
+
+        # Collect missing items per participant
         for p in participants:
             days = p.days_remaining()
-
-            # Collect missing items
-            missing_items = []
-            checks = {
-                "Monitor Downloaded": p.monitor_downloaded,
-                "Ultrasound Downloaded": p.ultrasound_downloaded,
-                "Case Report Form": p.case_report_form_uploaded,
-                "Video Laryngoscope": p.video_laryngoscope_uploaded,
-                "ROP Final Report": p.rop_final_report_uploaded,
-                "Head US Images": p.head_ultrasound_images_uploaded,
-                "Head US Report": p.head_ultrasound_report_uploaded,
-                "Cost Effectiveness Data": p.cost_effectiveness_data_uploaded,
-                "Blood Culture": p.blood_culture_done,
-                "Admission Notes Day 1": p.admission_notes_day1_uploaded,
-            }
-
-            for label, status in checks.items():
-                if not status:
-                    missing_items.append(label)
+            missing_items = [
+                label for label, status in {
+                    "Monitor Downloaded": p.monitor_downloaded,
+                    "Ultrasound Downloaded": p.ultrasound_downloaded,
+                    "Case Report Form": p.case_report_form_uploaded,
+                    "Video Laryngoscope": p.video_laryngoscope_uploaded,
+                    "ROP Final Report": p.rop_final_report_uploaded,
+                    "Head US Images": p.head_ultrasound_images_uploaded,
+                    "Head US Report": p.head_ultrasound_report_uploaded,
+                    "Cost Effectiveness Data": p.cost_effectiveness_data_uploaded,
+                    "Blood Culture": p.blood_culture_done,
+                    "Admission Notes Day 1": p.admission_notes_day1_uploaded,
+                }.items() if not status
+            ]
 
             if not missing_items:
                 continue
 
-            # Build row: StudyID | all missing items | Days remaining
             row = f"""
             <tr>
-                <td>{p.study_id}</td>
-                <td>{', '.join(missing_items)}</td>
-                <td style="text-align:center;">{days if days >= 0 else 'Overdue'}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{p.study_id}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{', '.join(missing_items)}</td>
+                <td style="padding:8px; text-align:center; border:1px solid #ddd;">{days if days >= 0 else 'Overdue'}</td>
             </tr>
             """
 
             if days in [2, 1, 0]:
-                reminders["due"].append((p.site, row, days))
+                reminders["due"].append((p.site, row, days, p, missing_items))
             elif days < 0:
-                reminders["overdue"].append((p.site, row, days))
+                reminders["overdue"].append((p.site, row, days, p, missing_items))
 
-        # Function to format HTML table inside styled card
+        # Build HTML table
         def build_html_table(rows, title, highlight_color):
             return f"""
-            <div style="border:1px solid #ddd; border-radius:10px; padding:15px; 
-                        margin:20px 0; box-shadow:1px 2px 6px rgba(0,0,0,0.08);
-                        font-family:Arial, sans-serif; font-size:14px; color:#333;">
-                <h3 style="color:{highlight_color}; margin-top:0;">{title}</h3>
-                <table border="1" cellpadding="8" cellspacing="0" 
-                       style="border-collapse: collapse; width:100%; font-size:13px;">
-                    <tr style="background-color:#f9f9f9; text-align:left;">
-                        <th style="padding:8px;">Study ID</th>
-                        <th style="padding:8px;">Missing Items</th>
-                        <th style="padding:8px; text-align:center;">Days Remaining</th>
-                    </tr>
-                    {''.join(rows)}
+            <div style="border:1px solid #e1e1e1; border-radius:10px; padding:20px;
+                        margin:20px 0; box-shadow:0 4px 8px rgba(0,0,0,0.08); font-family:Arial,sans-serif; color:#444;">
+                <h2 style="color:{highlight_color}; font-size:20px; margin-bottom:15px;">{title}</h2>
+                <table style="border-collapse:collapse; width:100%; font-size:14px;">
+                    <thead>
+                        <tr style="background-color:#f1f1f1; text-align:left;">
+                            <th style="padding:10px; border:1px solid #ddd;">Study ID</th>
+                            <th style="padding:10px; border:1px solid #ddd;">Missing Items</th>
+                            <th style="padding:10px; text-align:center; border:1px solid #ddd;">Days Remaining</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {''.join(rows)}
+                    </tbody>
                 </table>
             </div>
             """
 
-        # Send Due reminders
+        # Helper to send emails with personalized greetings
+        def send_email(subject, table_html, recipients_list, status_color="#f0ad4e"):
+            for user in recipients_list:
+                name = f"{user.first_name} {user.last_name}".strip() or user.username
+                body_html = f"""
+                <div style="font-family:Arial,sans-serif; color:#444; font-size:14px; line-height:1.6;">
+                    <p>Dear {name},</p>
+                    <p>The following uploads are <strong style="color:{status_color};">{'OVERDUE' if status_color=='#d9534f' else 'pending'}</strong>:</p>
+                    {table_html}
+                    <p style="text-align:center; margin:20px 0;">
+                        <a href="https://preterm-data-tracker-9zcd.onrender.com" 
+                           style="background-color:{status_color}; color:white; padding:12px 20px; border-radius:6px; text-decoration:none; font-weight:bold;">
+                            🔗 {'Follow Up Now' if status_color=='#d9534f' else 'Login to Update'}
+                        </a>
+                    </p>
+                    <p style="font-size:12px; color:#888; text-align:center;">Automated alert from <b>Preterm Baby Tracker</b>.</p>
+                </div>
+                """
+                msg = EmailMultiAlternatives(subject, body_html, settings.DEFAULT_FROM_EMAIL, [user.email])
+                msg.attach_alternative(body_html, "text/html")
+                msg.send()
+
+        # ================= SEND DUE REMINDERS =================
         if reminders["due"]:
             for site in set(r[0] for r in reminders["due"]):
-                rows = [r[1] for r in reminders["due"] if r[0] == site]
-                days_list = [r[2] for r in reminders["due"] if r[0] == site]
-                subject = f"⚠️ Pending uploads due soon (D-{min(days_list)})"
-                table_html = build_html_table(rows, "Pending Uploads – Due Soon", "#f0ad4e")
+                site_rows = [r[1] for r in reminders["due"] if r[0] == site]
+                site_days = [r[2] for r in reminders["due"] if r[0] == site]
+                subject = f"Pending uploads due soon (Days-{min(site_days)})"
+                table_html = build_html_table(site_rows, "Pending Uploads – Due Soon", "#f0ad4e")
+                recipients = list(CustomUser.objects.filter(role__in=['RO','RA','AD'], site=site, is_active=True)) + superusers
 
-                recipients = CustomUser.objects.filter(
-                    role__in=['RO', 'RA', 'AD'], site=site, is_active=True
-                )
+                send_email(subject, table_html, recipients, status_color="#f0ad4e")
 
+                # Log notifications & send PI critical alerts
                 for user in recipients:
-                    body_html = f"""
-                    <div style="font-family:Arial, sans-serif; color:#333; font-size:14px;">
-                        <p>Dear {user.username},</p>
-                        <p>The following uploads are still pending and need your attention:</p>
-                        {table_html}
-                        <p style="margin:20px 0;">
-                            <a href="https://preterm-data-tracker-9zcd.onrender.com"
-                               style="background-color:#0275d8; color:white; padding:10px 16px; 
-                                      border-radius:5px; text-decoration:none; font-weight:bold;">
-                                Login to Update
-                            </a>
-                        </p>
-                        <p>Best regards,<br>
-                        <strong>Preterm Baby Tracker System</strong></p>
-                    </div>
-                    """
+                    for r in reminders["due"]:
+                        NotificationLog.objects.create(participant=r[3], notification_type='DAILY_PROMPT', recipient=user)
+                        if user.is_superuser and user.role == "PI":
+                            critical_items = [i for i in ['Ultrasound Downloaded','Blood Culture','ROP Final Report'] if i in r[4]]
+                            if critical_items:
+                                critical_html = build_html_table(
+                                    [f"<tr><td>{r[3].study_id}</td><td>{', '.join(critical_items)}</td><td>{r[2] if r[2]>=0 else 'Overdue'}</td></tr>"],
+                                    "Critical Pending Items – PI Attention Required",
+                                    "#d9534f"
+                                )
+                                pi_subject = f"🚨 Critical Pending Items for {r[3].study_id}"
+                                send_email(pi_subject, critical_html, [user], status_color="#d9534f")
 
-                    msg = EmailMultiAlternatives(
-                        subject,
-                        body_html,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [user.email],
-                    )
-                    msg.attach_alternative(body_html, "text/html")
-                    msg.send()
-
-        # Send Overdue reminders
+        # ================= SEND OVERDUE REMINDERS =================
         if reminders["overdue"]:
             rows = [r[1] for r in reminders["overdue"]]
             subject = "🚨 Overdue uploads – Immediate Action Required"
             table_html = build_html_table(rows, "Overdue Uploads", "#d9534f")
+            recipients = list(CustomUser.objects.filter(role__in=['RO','RA','AD'], is_active=True)) + superusers
 
-            recipients = CustomUser.objects.filter(role='AD', is_active=True)
+            send_email(subject, table_html, recipients, status_color="#d9534f")
 
+            # Log notifications & send PI critical alerts
             for user in recipients:
-                body_html = f"""
-                <div style="font-family:Arial, sans-serif; color:#333; font-size:14px;">
-                    <p>Dear {user.username},</p>
-                    <p>The following uploads are <b style="color:#d9534f;">overdue</b>:</p>
-                    {table_html}
-                    <p style="margin:20px 0;">
-                        <a href="https://preterm-data-tracker-9zcd.onrender.com"
-                           style="background-color:#d9534f; color:white; padding:10px 16px; 
-                                  border-radius:5px; text-decoration:none; font-weight:bold;">
-                            Follow Up Now
-                        </a>
-                    </p>
-                    <p>Best regards,<br>
-                    <strong>Preterm Baby Tracker System</strong></p>
-                </div>
-                """
+                for r in reminders["overdue"]:
+                    NotificationLog.objects.create(participant=r[3], notification_type='OVERDUE_ALERT', recipient=user)
+                    if user.is_superuser and user.role == "PI":
+                        critical_items = [i for i in ['Ultrasound Downloaded','Blood Culture','ROP Final Report'] if i in r[4]]
+                        if critical_items:
+                            critical_html = build_html_table(
+                                [f"<tr><td>{r[3].study_id}</td><td>{', '.join(critical_items)}</td><td>{r[2] if r[2]>=0 else 'Overdue'}</td></tr>"],
+                                "Critical Pending Items – PI Attention Required",
+                                "#d9534f"
+                            )
+                            pi_subject = f"🚨 Critical Pending Items for {r[3].study_id}"
+                            send_email(pi_subject, critical_html, [user], status_color="#d9534f")
 
-                msg = EmailMultiAlternatives(
-                    subject,
-                    body_html,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                )
-                msg.attach_alternative(body_html, "text/html")
-                msg.send()
-
-        self.stdout.write(self.style.SUCCESS("Grouped reminders sent successfully"))
+        self.stdout.write(self.style.SUCCESS("All reminders, superuser copies, and PI alerts sent successfully"))

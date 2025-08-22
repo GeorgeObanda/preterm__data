@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key safe in production
 SECRET_KEY = 'django-insecure-s$)!c8vhroeho_n)i*c$19iuml21!=g4!s@3&89g#7^ey7tj5='
 
-DEBUG = False
+DEBUG = True
 
 # Restrict allowed hosts to your deployed Render app
 ALLOWED_HOSTS = [
@@ -115,3 +115,4 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Site URL for login links in reminder emails
 SITE_URL = "https://preterm-data-tracker-9zcd.onrender.com"
+CSRF_FAILURE_VIEW = 'tracking.views.csrf_failure'

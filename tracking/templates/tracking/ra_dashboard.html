@@ -1,6 +1,8 @@
 {% extends "tracking/base.html" %}
 {% block content %}
 <div class="container mt-4">
+
+    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2>Preterm Babies Registered</h2>
         <a href="{% url 'tracking:register_participant' %}" class="btn btn-primary">
@@ -8,11 +10,20 @@
         </a>
     </div>
 
+    <!-- Dynamic alert for eligible participants remaining -->
+    {% if remaining %}
+        <div class="alert alert-info fw-semibold" role="alert">
+            You have {{ remaining }} eligible participant{% if remaining > 1 %}s{% endif %} remaining to register today.
+        </div>
+    {% endif %}
+
+    <!-- Participants table -->
     <div class="table-responsive">
         <table class="table table-striped table-hover align-middle text-center">
             <thead class="table-dark">
                 <tr>
                     <th class="text-start">Study ID</th>
+                    <th class="text-start">Date of Birth</th>
                     <th class="text-start">Enrollment Date</th>
                     <th class="text-start">Due Date</th>
                     <th>Days Remaining</th>
@@ -27,6 +38,7 @@
                                 {{ p.study_id }}
                             </a>
                         </td>
+                        <td class="text-start">{{ p.date_of_birth|date:"Y-m-d" }}</td>
                         <td class="text-start">{{ p.enrollment_date|date:"Y-m-d" }}</td>
                         <td class="text-start">{{ p.due_date|date:"Y-m-d" }}</td>
                         <td>
@@ -44,7 +56,7 @@
                     {% endif %}
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center text-muted">
+                    <td colspan="5" class="text-center text-muted">
                         No participants found.
                     </td>
                 </tr>

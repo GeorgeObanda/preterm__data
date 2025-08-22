@@ -32,6 +32,25 @@ class CustomUser(AbstractUser):
 
 
 # -----------------------
+# Screening Session Model
+# -----------------------
+class ScreeningSession(models.Model):
+    ra = models.ForeignKey(CustomUser, limit_choices_to={'role': 'RA'}, on_delete=models.CASCADE)
+    site = models.ForeignKey(Site, on_delete=models.CASCADE)
+    date = models.DateField(default=timezone.localdate)
+    number_screened = models.PositiveIntegerField(default=0)
+    number_eligible = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"Session {self.pk} by {self.ra} at {self.site} on {self.date}"
+
+
+# -----------------------
 # Participant Model
 # -----------------------
 class Participant(models.Model):
@@ -56,11 +75,10 @@ class Participant(models.Model):
         'CustomUser', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='ultrasound_downloads'
     )
-    monitor_downloaded = models.BooleanField(default=False)
-    monitor_downloaded_on = models.DateTimeField(null=True, blank=True)
 
-    ultrasound_downloaded = models.BooleanField(default=False)
+    monitor_downloaded_on = models.DateTimeField(null=True, blank=True)
     ultrasound_downloaded_on = models.DateTimeField(null=True, blank=True)
+
     # -----------------------
     # Form Upload Tracking (RO/Admin)
     # -----------------------
@@ -74,6 +92,17 @@ class Participant(models.Model):
     admission_notes_day1_uploaded = models.BooleanField(default=False)
     admission_notes_24hr_uploaded = models.BooleanField(default=False)
     vital_sign_monitoring_done = models.BooleanField(default=False)
+
+    # -----------------------
+    # New Fields for RA Tracking
+    # -----------------------
+    date_of_birth = models.DateField(null=True, blank=True)
+    screening_session = models.ForeignKey(
+        ScreeningSession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,  # allow empty for older participants
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 

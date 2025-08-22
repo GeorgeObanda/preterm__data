@@ -9,12 +9,15 @@ User = get_user_model()
 
 
 # ---------- Participant Forms ----------
-
 class ParticipantForm(forms.ModelForm):
     study_id = forms.CharField(
         max_length=3,
         validators=[RegexValidator(r'^\d{3}$', 'Enter exactly 3 digits')],
         widget=forms.TextInput(attrs={'placeholder': 'Enter 3-digit number', 'class': 'form-control'})
+    )
+
+    date_of_birth = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
     )
 
     enrollment_date = forms.DateField(
@@ -31,9 +34,9 @@ class ParticipantForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Hide site for RA (auto-assign); require for AD/RO
         if self.user:
             if self.user.role == 'RA':
+                # RA: auto-assign site, hide site field
                 self.fields.pop('site', None)
             elif self.user.role in ['AD', 'RO']:
                 self.fields['site'].required = True
@@ -42,12 +45,11 @@ class ParticipantForm(forms.ModelForm):
 
     def clean_study_id(self):
         number_part = self.cleaned_data.get('study_id')
-        # Determine site automatically if RA
-        site = self.cleaned_data.get('site') or (self.user.site if self.user and hasattr(self.user, 'site') else None)
+        site = self.cleaned_data.get('site') or getattr(self.user, 'site', None)
         if not site:
             raise ValidationError("Site must be specified either by selection or your user profile.")
 
-        full_study_id = f"{str(site)}_{number_part}"
+        full_study_id = f"{site}_{number_part}"
 
         qs = Participant.objects.filter(study_id=full_study_id)
         if self.instance.pk:
@@ -59,7 +61,6 @@ class ParticipantForm(forms.ModelForm):
 
     def save(self, commit=True):
         participant = super().save(commit=False)
-        # Auto-assign RA's site
         if self.user and self.user.role == 'RA':
             participant.site = self.user.site
         if commit:
@@ -68,8 +69,7 @@ class ParticipantForm(forms.ModelForm):
 
     class Meta:
         model = Participant
-        fields = ['study_id', 'enrollment_date', 'site']  # site can stay for AD/RO
-
+        fields = ['study_id', 'date_of_birth', 'enrollment_date', 'site']
 
 class ParticipantUpdateForm(forms.ModelForm):
     """Used by RO/Admin to update participant upload/checklist status."""
@@ -94,7 +94,8 @@ class ParticipantUpdateForm(forms.ModelForm):
         }
 
 
-# ---------- Signup Form (unchanged) ----------
+# ---------- Signup Form ----------
+# ---------- Signup Form ----------
 class SignupForm(UserCreationForm):
     ROLE_CHOICES = (
         ('RA', 'Research Assistant'),
@@ -116,7 +117,14 @@ class SignupForm(UserCreationForm):
     class Meta:
         model = User
         fields = [
-            'username', 'first_name', 'last_name', 'email', 'role', 'site', 'password1', 'password2'
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'role',
+            'site',
+            'password1',
+            'password2'
         ]
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter username'}),
@@ -126,6 +134,12 @@ class SignupForm(UserCreationForm):
             'password1': forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter password'}),
             'password2': forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm password'}),
         }
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("This email is already used. Please use a different email.")
+        return email
 
     def clean_role(self):
         role = self.cleaned_data.get('role')
@@ -143,14 +157,20 @@ class SignupForm(UserCreationForm):
         cleaned_data = super().clean()
         role = cleaned_data.get('role')
         site = cleaned_data.get('site')
+
         if role in ['RA', 'RO', 'AD'] and not site:
             self.add_error('site', 'This field is required for your role.')
+
         return cleaned_data
 
     def save(self, commit=True):
         user = super().save(commit=False)
+
+        # Ensure PI/Admin has site assigned
         if user.role == 'AD' and not user.site:
             raise ValidationError("Admin users must have a site assigned.")
+
         if commit:
             user.save()
         return user
+

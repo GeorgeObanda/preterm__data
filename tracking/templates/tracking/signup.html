@@ -36,6 +36,10 @@
     border-color: #2575fc;
     box-shadow: 0 0 8px rgba(37,117,252,0.3);
   }
+  /* Red border on invalid fields */
+  .form-control.is-invalid {
+    border-color: #dc3545 !important;
+  }
   button.btn-primary {
     background: linear-gradient(90deg, #6a11cb 0%, #2575fc 100%);
     border: none;
@@ -53,7 +57,13 @@
   .login-text { color: #444; font-size: 0.95rem; }
   .login-text a { font-weight: 600; color: #2575fc; text-decoration: none; }
   .login-text a:hover { text-decoration: underline; }
-  .errorlist { color: red; font-size: 0.85rem; margin-top: 0.25rem; }
+  .errorlist {
+    color: red;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    list-style: none;
+    padding-left: 0;
+  }
 </style>
 
 <div class="container d-flex justify-content-center align-items-center" style="min-height: 85vh;">
@@ -64,20 +74,32 @@
 
     <form method="post" novalidate>
       {% csrf_token %}
-      {{ form.non_field_errors }}
+
+      {% if form.non_field_errors %}
+        <ul class="errorlist mb-3">
+          {% for error in form.non_field_errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
 
       {% for field in form %}
         <div class="mb-3 text-start" id="field-{{ field.name }}">
           <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
 
-          {% if field.name == "role" or field.name == "site" %}
-            {{ field|add_class:"form-control" }}
+          {# Add red border if field has errors #}
+          {% if field.errors %}
+            {{ field|add_class:"form-control is-invalid" }}
           {% else %}
             {{ field|add_class:"form-control" }}
           {% endif %}
 
           {% if field.errors %}
-            <div class="errorlist">{{ field.errors|striptags }}</div>
+            <ul class="errorlist">
+              {% for error in field.errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+            </ul>
           {% endif %}
         </div>
       {% endfor %}
@@ -95,7 +117,7 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Role field
+    // Role field placeholder
     const roleFieldWrapper = document.getElementById("field-role");
     const roleSelect = roleFieldWrapper ? roleFieldWrapper.querySelector("select") : null;
     if (roleSelect) {
@@ -107,7 +129,7 @@ document.addEventListener("DOMContentLoaded", function () {
       roleSelect.insertBefore(placeholder, roleSelect.firstChild);
     }
 
-    // Site field
+    // Site field placeholder
     const siteFieldWrapper = document.getElementById("field-site");
     const siteSelect = siteFieldWrapper ? siteFieldWrapper.querySelector("select") : null;
     if (siteSelect) {
