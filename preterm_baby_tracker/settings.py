@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import dj_database_url   # <--- install this (pip install dj-database-url psycopg2-binary)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -63,12 +64,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'preterm_baby_tracker.wsgi.application'
 
-# Database (SQLite for now; can switch to Postgres on Render)
+# -------------------------------
+# Database (SQLite locally, Postgres on Render)
+# -------------------------------
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        ssl_require=False
+    )
 }
 
 # Password validators
