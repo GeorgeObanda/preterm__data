@@ -10,11 +10,15 @@ SECRET_KEY = 'django-insecure-s$)!c8vhroeho_n)i*c$19iuml21!=g4!s@3&89g#7^ey7tj5=
 DEBUG = True
 
 # Restrict allowed hosts to your deployed Render app
+# Restrict allowed hosts to your deployed Render app
 ALLOWED_HOSTS = [
     'preterm-data-tracker-9zcd.onrender.com',
+    'pretermafricastudy.org',
+    'www.pretermafricastudy.org',
     'localhost',
     '127.0.0.1',
 ]
+
 
 # Installed apps
 INSTALLED_APPS = [
