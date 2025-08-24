@@ -53,6 +53,9 @@ class ScreeningSession(models.Model):
 # -----------------------
 # Participant Model
 # -----------------------
+# -----------------------
+# Participant Model
+# -----------------------
 class Participant(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     screening_session = models.ForeignKey(
@@ -109,16 +112,24 @@ class Participant(models.Model):
     class Meta:
         ordering = ['-enrollment_date']
 
+    # -----------------------
+    # Save method
+    # -----------------------
     def save(self, *args, **kwargs):
-        if not self.due_date:
-            self.due_date = self.enrollment_date + timedelta(days=7)
+        # Always recalc due_date based on enrollment_date
+        self.due_date = self.enrollment_date + timedelta(days=7)
         super().save(*args, **kwargs)
 
+    # -----------------------
+    # Derived Properties
+    # -----------------------
+    @property
     def days_remaining(self):
+        """Number of days left until due_date."""
         return (self.due_date - timezone.localdate()).days
 
     def status_color(self):
-        days = self.days_remaining()
+        days = self.days_remaining
         if days >= 4:
             return 'green'
         elif 2 <= days <= 3:
@@ -147,6 +158,7 @@ class Participant(models.Model):
 
     def __str__(self):
         return f"{self.study_id} ({self.site.name})"
+
 
 
 # -----------------------
