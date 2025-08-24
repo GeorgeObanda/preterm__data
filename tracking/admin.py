@@ -48,7 +48,6 @@ class ScreeningSessionAdmin(admin.ModelAdmin):
     list_filter = ('ra', 'site', 'date')
     search_fields = ('ra__username', 'site__name')
 
-
 # -----------------------
 # Participant Admin
 # -----------------------
@@ -61,8 +60,6 @@ class ParticipantAdmin(admin.ModelAdmin):
         "date_of_birth",
         "enrollment_date",
         "due_date",
-        "number_screened",      # ✅ captured directly on Participant
-        "number_eligible",      # ✅ captured directly on Participant
         "monitor_downloaded",
         "ultrasound_downloaded",
         "is_completed_display",  # ✅ wrapper instead of raw method
@@ -79,10 +76,8 @@ class ParticipantAdmin(admin.ModelAdmin):
     # Searchable fields
     search_fields = ("study_id",)
 
-    # Editable fields directly in list view (⚡ removed is_completed — not a DB field)
+    # Editable fields directly in list view
     list_editable = (
-        "number_screened",
-        "number_eligible",
         "monitor_downloaded",
         "ultrasound_downloaded",
     )
@@ -93,7 +88,6 @@ class ParticipantAdmin(admin.ModelAdmin):
     @admin.display(boolean=True, description="Completed")
     def is_completed_display(self, obj):
         return obj.is_completed()
-
 
 # -----------------------
 # Notification Log Admin

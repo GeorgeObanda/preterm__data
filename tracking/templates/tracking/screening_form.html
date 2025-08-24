@@ -1,0 +1,48 @@
+{% extends "tracking/base.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow-lg border-0 rounded-4 p-4" style="max-width: 450px; width: 100%;">
+        <div class="card-body">
+            <h3 class="card-title text-center mb-4 fw-bold text-primary">Screening</h3>
+
+            <form method="post" action="">
+                {% csrf_token %}
+
+                <!-- Number screened -->
+                <div class="mb-3">
+                    <label for="number_screened" class="form-label fw-semibold">Number Screened Today</label>
+                    <input type="number" class="form-control form-control-lg rounded-3"
+                           id="number_screened" name="number_screened" required min="0">
+                </div>
+
+                <!-- Number eligible -->
+                <div class="mb-4">
+                    <label for="eligible" class="form-label fw-semibold">Number Eligible</label>
+                    <input type="number" class="form-control form-control-lg rounded-3"
+                           id="eligible" name="eligible" required min="0">
+                </div>
+
+                {% if request.user.is_superuser or request.user.role == "AD" %}
+                <!-- Site selection (only for superuser / AD) -->
+                <div class="mb-4">
+                    <label for="site_id" class="form-label fw-semibold">Select Site</label>
+                    <select id="site_id" name="site_id" class="form-select form-select-lg rounded-3" required>
+                        <option value="">-- Choose Site --</option>
+                        {% for site in sites %}
+                        <option value="{{ site.id }}">{{ site.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <!-- Submit -->
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg rounded-3 shadow-sm">
+                        Save Screening
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

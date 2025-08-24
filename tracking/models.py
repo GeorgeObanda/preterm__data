@@ -55,8 +55,14 @@ class ScreeningSession(models.Model):
 # -----------------------
 class Participant(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
+    screening_session = models.ForeignKey(
+        ScreeningSession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,  # allow empty for older participants
+    )
     study_id = models.CharField(max_length=50, unique=True)
-    enrollment_date = models.DateField(default=timezone.now)
+    enrollment_date = models.DateField(default=timezone.localdate)
     due_date = models.DateField(editable=False)
 
     # -----------------------
@@ -97,18 +103,6 @@ class Participant(models.Model):
     # New Fields for RA Tracking
     # -----------------------
     date_of_birth = models.DateField(null=True, blank=True)
-    screening_session = models.ForeignKey(
-        ScreeningSession,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,  # allow empty for older participants
-    )
-
-    # -----------------------
-    # New Direct Fields
-    # -----------------------
-    number_screened = models.IntegerField(default=0)
-    number_eligible = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
 

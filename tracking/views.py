@@ -16,9 +16,10 @@ from reportlab.lib.styles import ParagraphStyle
 from django.db.models import Q
 from django.db.models import Sum
 from datetime import datetime
-
-from .models import Participant, ScreeningSession
+from .forms import ParticipantForm, ScreeningForm
+from .models import Participant, ScreeningSession,Site
 from .forms import ParticipantForm, SignupForm
+from django.http import HttpResponseRedirect
 
 User = get_user_model()
 
@@ -238,28 +239,39 @@ def auto_logout_view(request):
 
 
 # ---------------------- Dashboard Views ----------------------
-
 @login_required
 def choose_dashboard(request):
-    # Allow access if user is AD (PI) or superuser
+    # Allow access if user is AD (PI), RO, or superuser
     if request.user.role not in ['AD', 'RO'] and not request.user.is_superuser:
         return render(
             request,
             'tracking/forbidden.html',
-            {'message': "Only PIs or superusers can access this page."}
+            {'message': "Only PIs, ROs, or superusers can access this page."}
         )
 
-    # Superusers see all participants, AD sees only their assigned participants
+    # Superusers see all participants & screenings
     if request.user.is_superuser:
         participants = Participant.objects.all()
+        screenings = ScreeningSession.objects.all()
     else:
         participants = get_user_participants(request.user)
+        screenings = ScreeningSession.objects.filter(site=request.user.site)
 
     pending = pending_participants(participants)
     completed = completed_participants(participants)
 
-    # Total number screened (sum of number_screened column)
-    number_screened = participants.aggregate(total_screened=Sum('number_screened'))['total_screened'] or 0
+    # ✅ Total number screened (from ScreeningSession)
+    number_screened = screenings.aggregate(total=Sum('number_screened'))['total'] or 0
+
+    # Keep site_summary for breakdown (eligible remains unchanged)
+    site_summary = (
+        screenings.values('site__name')
+        .annotate(
+            total_screened=Sum('number_screened'),
+            total_eligible=Sum('number_eligible'),
+        )
+        .order_by('site__name')
+    )
 
     return render(
         request,
@@ -268,9 +280,13 @@ def choose_dashboard(request):
             'participants': participants,
             'pending': pending,
             'completed': completed,
-            'number_screened': number_screened
+            'number_screened': number_screened,  # ✅ Now available for cards
+            'site_summary': site_summary,
         }
     )
+
+
+
 @login_required(login_url=reverse_lazy('tracking:ra_login'))
 def ra_dashboard(request):
     if request.user.role not in ('RA', 'AD') and not request.user.is_superuser:
@@ -305,22 +321,53 @@ def ro_dashboard(request):
 # ---------------------- Participant Management ----------------------
 @login_required
 def register_participant(request):
-    if request.method == "POST":
-        form = ParticipantForm(request.POST, user=request.user)
-        if form.is_valid():
-            participant = form.save()
-            messages.success(
-                request,
-                f"Participant {participant.study_id} saved. "
-                f"Screened: {participant.number_screened}, Eligible: {participant.number_eligible}."
+    # --- Step 1: Screening form submission ---
+    if request.method == "POST" and "number_screened" in request.POST:
+        screening_form = ScreeningForm(request.POST)
+        if screening_form.is_valid():
+            ScreeningSession.objects.create(
+                ra=request.user,
+                site=request.user.site,
+                date=timezone.localdate(),
+                number_screened=screening_form.cleaned_data["number_screened"],
+                number_eligible=screening_form.cleaned_data["number_eligible"],
             )
-            return redirect('tracking:register_participant')
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = ParticipantForm(user=request.user)
+            # Redirect to participant form (fresh GET request)
+            request.session["screening_done"] = True
+            return redirect("tracking:register_participant")
+        return render(request, "tracking/screening_form.html", {"form": screening_form})
 
-    return render(request, 'tracking/register_participant.html', {"form": form})
+    # --- Step 2: Participant form submission ---
+    if request.method == "POST" and request.session.get("screening_done"):
+        participant_form = ParticipantForm(request.POST, user=request.user)
+        if participant_form.is_valid():
+            participant = participant_form.save(commit=False)
+            participant.site = request.user.site
+            participant.save()
+            messages.success(request, "Participant saved successfully.")
+
+            # Redirect to the correct dashboard based on user role
+            if request.user.is_ra:
+                return redirect("tracking:ra_dashboard")
+            elif request.user.is_ro:
+                return redirect("tracking:ro_dashboard")
+            elif request.user.is_pi or request.user.is_superuser:
+                return redirect("tracking:choose_dashboard")
+
+        # Invalid form → show errors
+        return render(request, "tracking/participant_form.html", {"form": participant_form})
+
+    # --- GET request ---
+    if request.session.get("screening_done"):
+        # Screening done → show participant form
+        participant_form = ParticipantForm(user=request.user)
+        return render(request, "tracking/participant_form.html", {"form": participant_form})
+
+    # Screening not done → show screening form
+    screening_form = ScreeningForm()
+    return render(request, "tracking/screening_form.html", {"form": screening_form})
+
+
 @login_required
 def participant_detail(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
@@ -479,30 +526,50 @@ def download_completed_pdf(request):
 
 @login_required(login_url=reverse_lazy('tracking:ra_login'))
 def register_participant(request):
+    # Restrict access
     if request.user.role not in ('RA', 'AD') and not request.user.is_superuser:
-        return render(request, 'tracking/forbidden.html',
-                      {'message': "Only RAs, PIs, or superusers can register participants."})
+        return render(
+            request,
+            'tracking/forbidden.html',
+            {'message': "Only RAs, PIs, or superusers can register participants."}
+        )
+
+    # Read ?eligible=N query param
+    eligible_qs = request.GET.get("eligible")
+    try:
+        eligible_count = int(eligible_qs) if eligible_qs is not None else None
+    except ValueError:
+        eligible_count = None
 
     if request.method == 'POST':
         form = ParticipantForm(request.POST, user=request.user)
         if form.is_valid():
             participant = form.save(commit=False)
 
-            # Assign site automatically if not superuser
+            # Ensure site assignment
             if not participant.site:
                 if request.user.is_superuser:
                     messages.error(request, "Site must be selected for superuser registration.")
-                    return render(request, 'tracking/participant_form.html', {'form': form})
+                    return render(
+                        request,
+                        'tracking/participant_form.html',
+                        {'form': form, 'eligible': eligible_count}
+                    )
                 participant.site = request.user.site
 
             participant.save()
             messages.success(request, f"Participant {participant.study_id} registered.")
             return redirect('tracking:ra_dashboard')
+        else:
+            messages.error(request, "Please correct the errors below.")
     else:
         form = ParticipantForm(user=request.user)
 
-    return render(request, 'tracking/participant_form.html', {'form': form})
-
+    return render(
+        request,
+        'tracking/participant_form.html',
+        {'form': form, 'eligible': eligible_count}
+    )
 
 @login_required
 def participant_detail(request, pk):
@@ -511,11 +578,6 @@ def participant_detail(request, pk):
         return render(request, 'tracking/forbidden.html', {'message': "You can only view participants from your site."})
     can_edit = request.user.role in ['AD', 'RO'] or request.user.is_superuser
     return render(request, 'tracking/participant_detail.html', {'participant': participant, 'can_edit': can_edit})
-
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from tracking.models import Participant
 
 @login_required
 def update_participant(request, pk):
@@ -627,3 +689,68 @@ def blog(request):
 
 def csrf_failure(request, reason=""):
     return render(request, "csrf_failure.html", status=403)
+
+#-----------------Screening View----------------------
+@login_required()
+def screening_view(request):
+    if request.method == "POST":
+        try:
+            number_screened = int(request.POST.get("number_screened", 0))
+            number_eligible = int(request.POST.get("eligible", 0))
+        except (TypeError, ValueError):
+            messages.error(request, "Please enter valid whole numbers.")
+            return HttpResponseRedirect(reverse("tracking:screening"))
+
+        # Determine site
+        site = None
+        if request.user.role in ["RA", "RO"] and request.user.site:
+            # RA and RO → use their site directly
+            site = request.user.site
+        elif request.user.is_superuser or request.user.role == "AD":
+            # Superuser/AD → must pick site from dropdown
+            site_id = request.POST.get("site_id")
+            if site_id:
+                try:
+                    site = Site.objects.get(id=site_id)
+                except Site.DoesNotExist:
+                    messages.error(request, "Invalid site selected.")
+                    return HttpResponseRedirect(reverse("tracking:screening"))
+            else:
+                messages.error(request, "No site found. Please select a site.")
+                return HttpResponseRedirect(reverse("tracking:screening"))
+
+        # Save the screening session
+        ScreeningSession.objects.create(
+            ra=request.user,
+            site=site,
+            number_screened=number_screened,
+            number_eligible=number_eligible,
+        )
+
+        messages.success(
+            request,
+            f"Screening saved successfully. {number_eligible} participant(s) eligible"
+        )
+
+        # If eligible participants, redirect to registration
+        if number_eligible > 0:
+            url = f"{reverse('tracking:register_participant')}?eligible={number_eligible}"
+            return HttpResponseRedirect(url)
+
+        # Otherwise, go back to dashboard
+        if request.user.role == "RA":
+            return HttpResponseRedirect(reverse("tracking:ra_dashboard"))
+        if request.user.role == "RO":
+            return HttpResponseRedirect(reverse("tracking:ro_dashboard"))
+        return HttpResponseRedirect(reverse("choose_dashboard"))
+
+    # --- GET request ---
+    context = {}
+    if request.user.is_superuser or request.user.role == "AD":
+        context["sites"] = Site.objects.all()
+
+    return render(request, "tracking/screening_form.html", context)
+
+
+
+

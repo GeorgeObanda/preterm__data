@@ -21,8 +21,12 @@ urlpatterns = [
     path('dashboard/ra/', views.ra_dashboard, name='ra_dashboard'),
     path('dashboard/ro/', views.ro_dashboard, name='ro_dashboard'),
 
+    # Screening
+    path('screening/', views.screening_view, name='screening'),
+
     # Participant management
     path('participant/register/', views.register_participant, name='register_participant'),
+
     path('participant/<int:pk>/', views.participant_detail, name='participant_detail'),
     path('participant/<int:pk>/update/', views.update_participant, name='update_participant'),
     path('participant/<int:pk>/monitor/', views.mark_monitor_downloaded, name='mark_monitor_downloaded'),
