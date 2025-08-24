@@ -53,16 +53,13 @@ class ScreeningSession(models.Model):
 # -----------------------
 # Participant Model
 # -----------------------
-# -----------------------
-# Participant Model
-# -----------------------
 class Participant(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     screening_session = models.ForeignKey(
         ScreeningSession,
         on_delete=models.CASCADE,
         null=True,
-        blank=True,  # allow empty for older participants
+        blank=True,
     )
     study_id = models.CharField(max_length=50, unique=True)
     enrollment_date = models.DateField(default=timezone.localdate)
@@ -158,7 +155,6 @@ class Participant(models.Model):
 
     def __str__(self):
         return f"{self.study_id} ({self.site.name})"
-
 
 
 # -----------------------

@@ -4,7 +4,7 @@
 
     <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Preterm Babies Registered</h2>
+        <h2>Preterm Babies Enrolled</h2>
         <a href="{% url 'tracking:screening' %}" class="btn btn-primary">
             + Register New Participant
         </a>
@@ -26,7 +26,7 @@
                     <th class="text-start">Date of Birth</th>
                     <th class="text-start">Enrollment Date</th>
                     <th class="text-start">Due Date</th>
-                    <th>Days Remaining</th>
+                    <th>Days Remaining to Download/Upload Data</th>
                 </tr>
             </thead>
             <tbody>
@@ -38,9 +38,9 @@
                                 {{ p.study_id }}
                             </a>
                         </td>
-                        <td class="text-start">{{ p.date_of_birth|date:"Y-m-d" }}</td>
-                        <td class="text-start">{{ p.enrollment_date|date:"Y-m-d" }}</td>
-                        <td class="text-start">{{ p.due_date|date:"Y-m-d" }}</td>
+                        <td class="text-start">{{ p.date_of_birth|date:"d-m-Y" }}</td>
+                        <td class="text-start">{{ p.enrollment_date|date:"d-m-Y" }}</td>
+                        <td class="text-start">{{ p.due_date|date:"d-m-Y" }}</td>
                         <td>
                             {% if p.days_remaining is not None %}
                                 <span class="badge rounded-pill px-3 py-2"

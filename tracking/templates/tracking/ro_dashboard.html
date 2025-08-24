@@ -39,15 +39,17 @@
 
                     <!-- Center-aligned columns -->
                     <td>
+                        {% with days=p.days_remaining %}
                         <span class="badge rounded-pill px-3 py-2"
                               style="background-color:
-                                  {% if p.days_remaining < 3 %}#dc3545
-                                  {% elif p.days_remaining < 5 %}#fd7e14
+                                  {% if days < 3 %}#dc3545
+                                  {% elif days < 5 %}#fd7e14
                                   {% else %}#28a745
                                   {% endif %};
                                   color: white;">
-                            {{ p.days_remaining }}
+                            {{ days }}
                         </span>
+                        {% endwith %}
                     </td>
                     <td>{{ p.monitor_downloaded|yesno:"✅,❌" }}</td>
                     <td>{{ p.ultrasound_downloaded|yesno:"✅,❌" }}</td>

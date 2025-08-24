@@ -16,11 +16,11 @@ class Command(BaseCommand):
 
         # Collect missing items per participant
         for p in participants:
-            days = p.days_remaining()
+            days = p.days_remaining  # ✅ field, not a method
             missing_items = [
                 label for label, status in {
-                    "Monitor Downloaded": p.monitor_downloaded,
-                    "Ultrasound Downloaded": p.ultrasound_downloaded,
+                    "Monitor Data": p.monitor_downloaded,
+                    "Ultrasound Data": p.ultrasound_downloaded,
                     "Case Report Form": p.case_report_form_uploaded,
                     "Video Laryngoscope": p.video_laryngoscope_uploaded,
                     "ROP Final Report": p.rop_final_report_uploaded,
@@ -69,7 +69,7 @@ class Command(BaseCommand):
             </div>
             """
 
-        # Helper to send emails with personalized greetings
+        # Helper to send emails
         def send_email(subject, table_html, recipients_list, status_color="#f0ad4e"):
             for user in recipients_list:
                 name = f"{user.first_name} {user.last_name}".strip() or user.username

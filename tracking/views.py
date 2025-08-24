@@ -305,8 +305,6 @@ def ra_dashboard(request):
     sorted_participants = sorted(pending_participants, key=lambda p: p.enrollment_date, reverse=True)
     return render(request, 'tracking/ra_dashboard.html', {'participants': sorted_participants})
 
-
-
 @login_required(login_url=reverse_lazy('tracking:ro_login'))
 def ro_dashboard(request):
     if request.user.role not in ('RO', 'AD') and not request.user.is_superuser:
@@ -314,9 +312,8 @@ def ro_dashboard(request):
 
     participants = get_user_participants(request.user)
     pending = [p for p in participants if p not in completed_participants(participants)]
-    sorted_participants = sorted(pending, key=lambda p: p.days_remaining())
+    sorted_participants = sorted(pending, key=lambda p: p.days_remaining)  # removed ()
     return render(request, 'tracking/ro_dashboard.html', {'participants': sorted_participants})
-
 
 # ---------------------- Participant Management ----------------------
 @login_required
