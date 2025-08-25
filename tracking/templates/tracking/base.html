@@ -49,14 +49,14 @@
                 </li>
                 {% if user.is_authenticated %}
                     <li class="nav-item me-2">
-                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ra_dashboard' %}">RA Dashboard</a>
+                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ra_dashboard' %}">Enroll</a>
                     </li>
                     <li class="nav-item me-2">
-                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ro_dashboard' %}">RO Dashboard</a>
+                        <a class="nav-link text-white fw-semibold" href="{% url 'tracking:ro_dashboard' %}">Data</a>
                     </li>
-                    {% if user.role == 'AD' or user.role == 'RO' or user.is_superuser %}
+                    {% if user.role in 'AD RO RA' or user.is_superuser %}
                         <li class="nav-item me-2">
-                            <a class="nav-link text-white fw-semibold" href="{% url 'tracking:choose_dashboard' %}">PI Dashboard</a>
+                            <a class="nav-link text-white fw-semibold" href="{% url 'tracking:choose_dashboard' %}">Overview</a>
                         </li>
                     {% endif %}
                     <li class="nav-item me-3">
@@ -108,9 +108,9 @@
             <div class="col-md-4 mb-4">
                 <h6 class="fw-bold">Quick Links</h6>
                 <ul class="list-unstyled">
-                    <li><a href="{% url 'tracking:ra_dashboard' %}">RA Dashboard</a></li>
-                    <li><a href="{% url 'tracking:ro_dashboard' %}">RO Dashboard</a></li>
-                    <li><a href="{% url 'tracking:choose_dashboard' %}">PI Dashboard</a></li>
+                    <li><a href="{% url 'tracking:ra_dashboard' %}">Enroll</a></li>
+                    <li><a href="{% url 'tracking:ro_dashboard' %}">Data</a></li>
+                    <li><a href="{% url 'tracking:choose_dashboard' %}">Overview</a></li>
                     <li><a href="{% url 'tracking:blog' %}">Blog</a></li>
                 </ul>
             </div>

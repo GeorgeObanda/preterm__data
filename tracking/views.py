@@ -242,7 +242,7 @@ def auto_logout_view(request):
 @login_required
 def choose_dashboard(request):
     # Allow access if user is AD (PI), RO, or superuser
-    if request.user.role not in ['AD', 'RO'] and not request.user.is_superuser:
+    if request.user.role not in ['AD', 'RO','RA'] and not request.user.is_superuser:
         return render(
             request,
             'tracking/forbidden.html',
@@ -280,7 +280,7 @@ def choose_dashboard(request):
             'participants': participants,
             'pending': pending,
             'completed': completed,
-            'number_screened': number_screened,  # ✅ Now available for cards
+            'number_screened': number_screened,  #Now available for cards
             'site_summary': site_summary,
         }
     )
