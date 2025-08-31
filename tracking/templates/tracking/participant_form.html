@@ -4,7 +4,7 @@
 {% block content %}
 <div class="d-flex justify-content-center bg-light mt-3">
   <div class="card shadow-lg rounded-4 p-4" style="max-width: 500px; width: 100%;">
-    <h2 class="mb-4 text-primary fw-bold text-center">Register Participant</h2>
+    <h2 class="mb-4 text-primary fw-bold text-center">🧾 Register Participant</h2>
 
     <!-- Back to Dashboard -->
     <div class="mb-4 text-center">
@@ -22,37 +22,58 @@
     <form method="post" novalidate>
       {% csrf_token %}
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Study ID</label>
-        {{ form.study_id|add_class:"form-control form-control-lg" }}
+      <!-- Study ID -->
+      <div class="form-floating mb-3">
+        {{ form.study_id|add_class:"form-control rounded-3 shadow-sm border-primary" }}
+        <label class="text-muted">Study ID</label>
         {% if form.study_id.errors %}
-          <div class="text-danger small">{{ form.study_id.errors|striptags }}</div>
+          <div class="text-danger small mt-1">{{ form.study_id.errors|striptags }}</div>
         {% endif %}
       </div>
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Date of Birth</label>
-        {{ form.date_of_birth|add_class:"form-control form-control-lg" }}
+      <!-- Date of Birth -->
+      <div class="form-floating mb-3">
+        {{ form.date_of_birth|add_class:"form-control rounded-3 shadow-sm border-success" }}
+        <label class="text-muted">Date of Birth</label>
         {% if form.date_of_birth.errors %}
-          <div class="text-danger small">{{ form.date_of_birth.errors|striptags }}</div>
+          <div class="text-danger small mt-1">{{ form.date_of_birth.errors|striptags }}</div>
         {% endif %}
       </div>
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold">Enrollment Date</label>
-        {{ form.enrollment_date|add_class:"form-control form-control-lg" }}
+      <!-- Enrollment Date -->
+      <div class="form-floating mb-3">
+        {{ form.enrollment_date|add_class:"form-control rounded-3 shadow-sm border-info" }}
+        <label class="text-muted">Enrollment Date</label>
         {% if form.enrollment_date.errors %}
-          <div class="text-danger small">{{ form.enrollment_date.errors|striptags }}</div>
+          <div class="text-danger small mt-1">{{ form.enrollment_date.errors|striptags }}</div>
         {% endif %}
       </div>
 
-      <!-- Submit Button -->
-      <div class="d-grid mt-4">
-        <button type="submit" name="action" value="finish" class="btn btn-primary btn-lg fw-semibold">
-          Save & Finish
+      <!-- Submit Buttons -->
+      <div class="d-grid gap-2 mt-4">
+        <button type="submit" name="action" value="finish" class="btn btn-gradient btn-lg fw-semibold rounded-3 shadow-sm">
+          ✅ Save & Finish
+        </button>
+        <button type="submit" name="add_another" value="yes" class="btn btn-outline-success btn-lg fw-semibold rounded-3 shadow-sm">
+          ➕ Save & Add Another
         </button>
       </div>
     </form>
   </div>
 </div>
+
+<!-- Gradient Button Style -->
+<style>
+.btn-gradient {
+    background: linear-gradient(45deg, #007bff, #00c6ff);
+    color: white;
+    font-weight: 600;
+    border: none;
+    transition: 0.3s ease-in-out;
+}
+.btn-gradient:hover {
+    background: linear-gradient(45deg, #0056b3, #0090cc);
+    transform: translateY(-2px);
+}
+</style>
 {% endblock %}

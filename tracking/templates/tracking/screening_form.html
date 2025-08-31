@@ -1,48 +1,74 @@
 {% extends "tracking/base.html" %}
 {% block content %}
-<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
-    <div class="card shadow-lg border-0 rounded-4 p-4" style="max-width: 450px; width: 100%;">
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 90vh;">
+    <div class="card shadow-lg border-0 rounded-4 p-4" style="max-width: 480px; width: 100%;">
         <div class="card-body">
-            <h3 class="card-title text-center mb-4 fw-bold text-primary">Screening</h3>
+            <!-- Title -->
+            <h3 class="text-center mb-4 fw-bold text-primary">📋 Screening Form</h3>
 
             <form method="post" action="">
                 {% csrf_token %}
 
+                <!-- Screening Date -->
+                <div class="form-floating mb-3">
+                    <input type="date" class="form-control rounded-3 shadow-sm border-primary"
+                           id="date" name="date"
+                           value="{{ today|date:'Y-m-d' }}" required>
+                    <label for="date" class="text-muted">Screening Date</label>
+                </div>
+
                 <!-- Number screened -->
-                <div class="mb-3">
-                    <label for="number_screened" class="form-label fw-semibold">Number Screened Today</label>
-                    <input type="number" class="form-control form-control-lg rounded-3"
-                           id="number_screened" name="number_screened" required min="0">
+                <div class="form-floating mb-3">
+                    <input type="number" class="form-control rounded-3 shadow-sm border-success"
+                           id="number_screened" name="number_screened"
+                           placeholder="Number Screened" required min="0">
+                    <label for="number_screened" class="text-muted">Number Screened</label>
                 </div>
 
                 <!-- Number eligible -->
-                <div class="mb-4">
-                    <label for="eligible" class="form-label fw-semibold">Number Eligible</label>
-                    <input type="number" class="form-control form-control-lg rounded-3"
-                           id="eligible" name="eligible" required min="0">
+                <div class="form-floating mb-3">
+                    <input type="number" class="form-control rounded-3 shadow-sm border-info"
+                           id="eligible" name="eligible"
+                           placeholder="Number Eligible" required min="0">
+                    <label for="eligible" class="text-muted">Number Eligible</label>
                 </div>
 
                 {% if request.user.is_superuser or request.user.role == "AD" %}
-                <!-- Site selection (only for superuser / AD) -->
-                <div class="mb-4">
-                    <label for="site_id" class="form-label fw-semibold">Select Site</label>
-                    <select id="site_id" name="site_id" class="form-select form-select-lg rounded-3" required>
-                        <option value="">-- Choose Site --</option>
+                <!-- Site selection -->
+                <div class="form-floating mb-3">
+                    <select id="site_id" name="site_id" class="form-select rounded-3 shadow-sm border-warning" required>
+                        <option value="">Select Site</option>
                         {% for site in sites %}
                         <option value="{{ site.id }}">{{ site.name }}</option>
                         {% endfor %}
                     </select>
+                    <label for="site_id" class="text-muted">Site</label>
                 </div>
                 {% endif %}
 
                 <!-- Submit -->
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary btn-lg rounded-3 shadow-sm">
-                        Save Screening
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-lg btn-gradient rounded-3 shadow-sm">
+                        ✅ Save
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<!-- Gradient Button Style -->
+<style>
+.btn-gradient {
+    background: linear-gradient(45deg, #007bff, #00c6ff);
+    color: white;
+    font-weight: 600;
+    border: none;
+    transition: 0.3s ease-in-out;
+}
+.btn-gradient:hover {
+    background: linear-gradient(45deg, #0056b3, #0090cc);
+    transform: translateY(-2px);
+}
+</style>
 {% endblock %}

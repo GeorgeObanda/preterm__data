@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from .models import Participant, Site, ScreeningSession
+from .models import Participant, Site, ScreeningSession,DailyLog
 
 User = get_user_model()
 
@@ -151,3 +151,14 @@ class SignupForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+class DailyLogForm(forms.ModelForm):
+    class Meta:
+        model = DailyLog
+        fields = ['date', 'title', 'tag', 'content']
+        widgets = {
+            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
+            'title': forms.TextInput(attrs={'class': 'form-control form-control-lg', 'placeholder': 'Short title'}),
+            'tag': forms.Select(attrs={'class': 'form-select form-select-lg'}),
+            'content': forms.Textarea(attrs={'class': 'form-control form-control-lg', 'rows': 4, 'placeholder': 'Write your observation here...'}),
+        }

@@ -53,6 +53,9 @@ class ScreeningSession(models.Model):
 # -----------------------
 # Participant Model
 # -----------------------
+# -----------------------
+# Participant Model
+# -----------------------
 class Participant(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     screening_session = models.ForeignKey(
@@ -69,6 +72,7 @@ class Participant(models.Model):
     # Core Tracking (RO/Admin)
     # -----------------------
     monitor_downloaded = models.BooleanField(default=False)
+    monitor_downloaded_comment = models.TextField(blank=True, null=True)
     monitor_downloaded_at = models.DateTimeField(null=True, blank=True)
     monitor_downloaded_by = models.ForeignKey(
         'CustomUser', null=True, blank=True, on_delete=models.SET_NULL,
@@ -76,28 +80,45 @@ class Participant(models.Model):
     )
 
     ultrasound_downloaded = models.BooleanField(default=False)
+    ultrasound_downloaded_comment = models.TextField(blank=True, null=True)
     ultrasound_downloaded_at = models.DateTimeField(null=True, blank=True)
     ultrasound_downloaded_by = models.ForeignKey(
         'CustomUser', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='ultrasound_downloads'
     )
 
-    monitor_downloaded_on = models.DateTimeField(null=True, blank=True)
-    ultrasound_downloaded_on = models.DateTimeField(null=True, blank=True)
-
     # -----------------------
     # Form Upload Tracking (RO/Admin)
     # -----------------------
     case_report_form_uploaded = models.BooleanField(default=False)
+    case_report_form_uploaded_comment = models.TextField(blank=True, null=True)
+
     video_laryngoscope_uploaded = models.BooleanField(default=False)
+    video_laryngoscope_uploaded_comment = models.TextField(blank=True, null=True)
+
     rop_final_report_uploaded = models.BooleanField(default=False)
+    rop_final_report_uploaded_comment = models.TextField(blank=True, null=True)
+
     head_ultrasound_images_uploaded = models.BooleanField(default=False)
+    head_ultrasound_images_uploaded_comment = models.TextField(blank=True, null=True)
+
     head_ultrasound_report_uploaded = models.BooleanField(default=False)
+    head_ultrasound_report_uploaded_comment = models.TextField(blank=True, null=True)
+
     cost_effectiveness_data_uploaded = models.BooleanField(default=False)
+    cost_effectiveness_data_uploaded_comment = models.TextField(blank=True, null=True)
+
     blood_culture_done = models.BooleanField(default=False)
+    blood_culture_done_comment = models.TextField(blank=True, null=True)
+
     admission_notes_day1_uploaded = models.BooleanField(default=False)
+    admission_notes_day1_uploaded_comment = models.TextField(blank=True, null=True)
+
     admission_notes_24hr_uploaded = models.BooleanField(default=False)
+    admission_notes_24hr_uploaded_comment = models.TextField(blank=True, null=True)
+
     vital_sign_monitoring_done = models.BooleanField(default=False)
+    vital_sign_monitoring_done_comment = models.TextField(blank=True, null=True)
 
     # -----------------------
     # New Fields for RA Tracking
@@ -137,24 +158,31 @@ class Participant(models.Model):
             return 'overdue'
 
     def is_completed(self):
-        """Check if all required downloads/uploads are done."""
+        """
+        Check if all required downloads/uploads are done.
+        An item is considered complete if either the checkbox is True or a comment exists.
+        """
         required_items = [
-            self.monitor_downloaded,
-            self.ultrasound_downloaded,
-            self.head_ultrasound_images_uploaded,
-            self.head_ultrasound_report_uploaded,
-            self.case_report_form_uploaded,
-            self.video_laryngoscope_uploaded,
-            self.rop_final_report_uploaded,
-            self.cost_effectiveness_data_uploaded,
-            self.admission_notes_day1_uploaded,
-            # self.admission_notes_24hr_uploaded,
-            # self.vital_sign_monitoring_done
+            ('monitor_downloaded', 'monitor_downloaded_comment'),
+            ('ultrasound_downloaded', 'ultrasound_downloaded_comment'),
+            ('head_ultrasound_images_uploaded', 'head_ultrasound_images_uploaded_comment'),
+            ('head_ultrasound_report_uploaded', 'head_ultrasound_report_uploaded_comment'),
+            ('case_report_form_uploaded', 'case_report_form_uploaded_comment'),
+            ('video_laryngoscope_uploaded', 'video_laryngoscope_uploaded_comment'),
+            ('rop_final_report_uploaded', 'rop_final_report_uploaded_comment'),
+            ('cost_effectiveness_data_uploaded', 'cost_effectiveness_data_uploaded_comment'),
+            ('admission_notes_day1_uploaded', 'admission_notes_day1_uploaded_comment'),
+            # include other items if needed
         ]
-        return all(required_items)
+
+        for checkbox_field, comment_field in required_items:
+            if not getattr(self, checkbox_field) and not getattr(self, comment_field):
+                return False
+        return True
 
     def __str__(self):
         return f"{self.study_id} ({self.site.name})"
+
 
 
 # -----------------------
@@ -175,3 +203,26 @@ class NotificationLog(models.Model):
 
     def __str__(self):
         return f"{self.get_notification_type_display()} → {self.participant.study_id} at {self.sent_at}"
+
+#------------Daily Log----------------
+class DailyLog(models.Model):
+    TAG_CHOICES = [
+        ('OBS', 'Observation'),
+        ('EQP', 'Equipment'),
+        ('REM', 'Reminder'),
+        ('MISC', 'Miscellaneous'),
+    ]
+
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    date = models.DateField(default=timezone.localdate)
+    title = models.CharField(max_length=100, blank=True, null=True)
+    tag = models.CharField(max_length=4, choices=TAG_CHOICES, default='MISC')
+    content = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.date} - {self.title or 'No Title'}"

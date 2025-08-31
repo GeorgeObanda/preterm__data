@@ -1,0 +1,282 @@
+{% extends "tracking/base.html" %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container-fluid p-0">
+
+  <!-- Info Banner styled like Bootstrap alert -->
+  <div id="infoBanner" class="alert alert-success alert-dismissible fade show rounded-3 mb-3 shadow-sm text-center" role="alert" style="font-size:0.95rem; padding: 8px 12px;">
+    This page allows you to record and review your daily activities for the Preterm Africa Study. Use the left form to log your activities and print button for printing and filters.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+
+  <div class="container-fluid mt-3">
+    <div class="row gx-4">
+
+      <!-- LEFT PANEL: Form -->
+      <div class="col-lg-4 mb-4">
+        <div class="card shadow-sm rounded-4 border-gradient">
+          <div class="card-header bg-gradient-header text-white fw-bold fs-5">
+            📝 Log Today's Entry
+          </div>
+          <div class="card-body">
+
+            <form method="post" novalidate>
+              {% csrf_token %}
+
+              <!-- Small metadata fields -->
+              <div class="form-floating mb-2">
+                {{ form.date|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
+                <label>Date</label>
+                {% if form.date.errors %}
+                <div class="text-danger small">{{ form.date.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <div class="form-floating mb-2">
+                {{ form.title|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
+                <label>Title</label>
+                {% if form.title.errors %}
+                <div class="text-danger small">{{ form.title.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <div class="form-floating mb-3">
+                {{ form.tag|add_class:"form-select form-select-sm shadow-sm border border-secondary" }}
+                <label>Tag</label>
+                {% if form.tag.errors %}
+                <div class="text-danger small">{{ form.tag.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <!-- Large auto-expanding content field -->
+              <div class="form-floating mb-3">
+                {{ form.content|add_class:"form-control shadow-sm border border-secondary" }}
+                <label>Content</label>
+                {% if form.content.errors %}
+                <div class="text-danger small">{{ form.content.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <div class="d-grid mt-3">
+                <button type="submit" class="btn btn-gradient btn-lg fw-semibold shadow-sm">
+                  ✅ Save Entry
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL: Logs Feed with Filters -->
+      <div class="col-lg-8">
+        <div class="d-flex flex-column gap-3">
+
+          <!-- Filter & Search Bar -->
+          <div class="d-flex mb-3 gap-2">
+            <input type="text" id="searchInput" placeholder="Search by title or content" class="form-control shadow-sm rounded-3 border border-secondary">
+            <input type="date" id="filterDate" class="form-control shadow-sm rounded-3 border border-secondary">
+            <select id="filterTag" class="form-select shadow-sm rounded-3 border border-secondary">
+              <option value="">All Tags</option>
+              <option value="OBS">Observation</option>
+              <option value="EQP">Meeting</option>
+              <option value="REM">Reminder</option>
+              <option value="MISC">Misc</option>
+            </select>
+            <button class="btn btn-outline-success" id="printCommentsBtn">📝 Print</button>
+          </div>
+
+          <!-- Logs as sticky notes -->
+          <div class="d-flex flex-wrap gap-3">
+            {% for log in logs %}
+            <div class="log-card"
+                 data-title="{{ log.title|lower }}"
+                 data-content="{{ log.content|lower }}"
+                 data-tag="{{ log.tag }}"
+                 data-date="{{ log.date|date:'Y-m-d' }}">
+                <div class="log-title">{{ log.title|default:"(No Title)" }}</div>
+                <div class="log-date">{{ log.date }}</div>
+                <div class="log-content">{{ log.content|linebreaksbr }}</div>
+            </div>
+            {% empty %}
+            <div class="text-center text-muted my-4 w-100">
+              No logs yet. Start by adding your first entry!
+            </div>
+            {% endfor %}
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Styles -->
+<style>
+  body {
+      background: linear-gradient(160deg, #f0f4ff, #ffffff);
+      font-family: 'Inter', sans-serif;
+      color: #333;
+  }
+
+  .bg-gradient-header {
+      background: linear-gradient(135deg, #4A90E2, #2C3E50);
+  }
+
+  .border-gradient {
+      border: 2px solid transparent;
+      border-radius: 1rem;
+      background-image: linear-gradient(white, white), linear-gradient(135deg, #4A90E2, #2C3E50);
+      background-origin: border-box;
+      background-clip: content-box, border-box;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  .btn-gradient {
+      background: linear-gradient(45deg, #4285F4, #34A853);
+      color: white;
+      font-weight: 600;
+      border: none;
+      border-radius: 1rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: 0.3s ease-in-out, transform 0.2s ease-in-out;
+  }
+  .btn-gradient:hover {
+      background: linear-gradient(45deg, #3367D6, #2A9348);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  }
+
+  .form-control, .form-select {
+      background: #ffffff;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+      transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .form-control:focus, .form-select:focus {
+      box-shadow: 0 0 0 3px rgba(66,133,244,0.25);
+      transform: scale(1.02);
+  }
+
+  .log-card {
+      width: 220px;
+      min-height: 150px;
+      padding: 1rem;
+      border-radius: 1rem;
+      border: 1px solid #ddd;
+      background-color: #fffb7d;
+      box-shadow: 4px 4px 15px rgba(0,0,0,0.2);
+      transform: rotate(-1deg);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      margin: 0.5rem;
+      display: inline-block;
+      vertical-align: top;
+  }
+  .log-card:hover {
+      transform: rotate(0deg) scale(1.03);
+      box-shadow: 6px 6px 20px rgba(0,0,0,0.25);
+  }
+
+  .log-title {
+      font-weight: 600;
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+  }
+  .log-date {
+      font-size: 0.8rem;
+      color: #555;
+      margin-bottom: 0.5rem;
+  }
+  .log-content {
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+  }
+
+  .log-card[data-tag="OBS"] { background-color: #ffefc1; }
+  .log-card[data-tag="EQP"] { background-color: #c1ffe0; }
+  .log-card[data-tag="REM"] { background-color: #ffc1c1; }
+  .log-card[data-tag="MISC"]{ background-color: #c1d4ff; }
+</style>
+
+<!-- Scripts -->
+<script>
+  // Auto-hide info banner after 10 seconds
+  setTimeout(() => {
+    const banner = document.getElementById('infoBanner');
+    if(banner) banner.style.display = 'none';
+  }, 10000);
+
+  // Auto-expand content textarea
+  const contentField = document.querySelector('#id_content');
+  if(contentField) {
+    contentField.style.overflow = 'hidden';
+    contentField.style.resize = 'none';
+    const adjustHeight = (el) => {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    };
+    contentField.addEventListener('input', (e) => adjustHeight(e.target));
+    adjustHeight(contentField);
+  }
+
+  const searchInput = document.getElementById('searchInput');
+  const filterDate = document.getElementById('filterDate'); // no default value
+  const filterTag = document.getElementById('filterTag');
+  const logCards = document.querySelectorAll('.log-card');
+
+  function filterLogs() {
+    const query = searchInput.value.toLowerCase();
+    const dateValue = filterDate.value;
+    const tagValue = filterTag.value;
+
+    logCards.forEach(card => {
+      const title = card.dataset.title;
+      const content = card.dataset.content;
+      const tag = card.dataset.tag;
+      const date = card.dataset.date;
+      let show = true;
+
+      if(query && !title.includes(query) && !content.includes(query)) show = false;
+      if(dateValue && date < dateValue) show = false; // date onward
+      if(tagValue && tag !== tagValue) show = false;
+
+      card.style.display = show ? '' : 'none';
+    });
+  }
+
+  searchInput.addEventListener('input', filterLogs);
+  filterDate.addEventListener('change', filterLogs);
+  filterTag.addEventListener('change', filterLogs);
+
+  // Trigger filtering on page load
+  filterLogs();
+
+  // Print only visible logs
+  document.getElementById('printCommentsBtn').addEventListener('click', () => {
+      const logs = document.querySelectorAll('.log-card');
+      let htmlContent = '<html><head><title>Daily Logs</title>';
+      htmlContent += '<style>body{font-family:Arial,sans-serif;padding:20px;} h2,h4,p{text-align:center;margin:4px 0;} .log{border-bottom:1px solid #ccc;margin-bottom:15px;padding-bottom:10px;} .title{font-weight:600;font-size:1rem;} .date{font-size:0.85rem;color:#555;margin-bottom:5px;} .content{white-space:pre-wrap;font-size:0.95rem;}</style>';
+      htmlContent += '</head><body>';
+      htmlContent += '<h2>Preterm Africa Study</h2>';
+      htmlContent += '<h4>Daily Logs</h4>';
+      htmlContent += '<p><strong></strong> <strong></strong></p><hr>';
+
+      logs.forEach(log => {
+          if(log.style.display !== 'none'){ // only visible logs
+              const title = log.querySelector('.log-title').innerText;
+              const date = log.querySelector('.log-date').innerText;
+              const content = log.querySelector('.log-content').innerText;
+              htmlContent += `<div class="log"><div class="title">${title}</div><div class="date">${date}</div><div class="content">${content}</div></div>`;
+          }
+      });
+
+      htmlContent += '</body></html>';
+
+      const printWindow = window.open('', '', 'height=600,width=800');
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      printWindow.print();
+  });
+</script>
+
+{% endblock %}

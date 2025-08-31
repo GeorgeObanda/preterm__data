@@ -26,7 +26,6 @@ urlpatterns = [
 
     # Participant management
     path('participant/register/', views.register_participant, name='register_participant'),
-
     path('participant/<int:pk>/', views.participant_detail, name='participant_detail'),
     path('participant/<int:pk>/update/', views.update_participant, name='update_participant'),
     path('participant/<int:pk>/monitor/', views.mark_monitor_downloaded, name='mark_monitor_downloaded'),
@@ -35,4 +34,7 @@ urlpatterns = [
     # Admin user approval/rejection
     path('user/<int:user_id>/approve/', views.approve_user, name='approve_user'),
     path('user/<int:user_id>/reject/', views.reject_user, name='reject_user'),
+
+    # Daily Logs (user-specific)
+    path('daily-logs/', views.daily_log_view, name='daily_logs'),
 ]

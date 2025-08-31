@@ -8,20 +8,18 @@ from django.contrib.auth import login, logout, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
-from django.db.models import Q
-from django.db.models import Sum
-from datetime import datetime
-from .forms import ParticipantForm, ScreeningForm
-from .models import Participant, ScreeningSession,Site
-from .forms import ParticipantForm, SignupForm
-from django.http import HttpResponseRedirect
+from django.db.models import Q, Sum
+
+from .forms import ParticipantForm, ScreeningForm, SignupForm,DailyLogForm
+from .models import Participant, ScreeningSession, Site,DailyLog
 
 User = get_user_model()
+
 
 # ---------------------- Helper Functions ----------------------
 
@@ -44,7 +42,8 @@ def pending_participants(participants):
         if not p.cost_effectiveness_data_uploaded: missing.append("Cost-Effect")
         if not p.blood_culture_done: missing.append("Blood Culture")
         if not p.admission_notes_day1_uploaded: missing.append("Notes Day 1")
-        if missing: pending_list.append({'participant': p, 'missing': missing})
+        if missing:
+            pending_list.append({'participant': p, 'missing': missing})
     return pending_list
 
 def completed_participants(participants):
@@ -60,6 +59,7 @@ def completed_participants(participants):
         ]):
             completed.append(p)
     return completed
+
 
 # ---------------------- Authentication Views ----------------------
 
@@ -189,11 +189,11 @@ class RAloginView(LoginView):
         return self._redirect_by_role(user)
 
     def _redirect_by_role(self, user):
-        if user.role == 'RA':
+        if getattr(user, "role", None) == 'RA':
             return redirect('tracking:ra_dashboard')
-        if user.role == 'RO':
+        if getattr(user, "role", None) == 'RO':
             return redirect('tracking:ro_dashboard')
-        if user.role == 'AD':
+        if getattr(user, "role", None) == 'AD':
             return redirect('tracking:choose_dashboard')
         if user.is_superuser:
             return redirect('tracking:ra_dashboard')
@@ -215,11 +215,11 @@ class ROloginView(LoginView):
         return self._redirect_by_role(user)
 
     def _redirect_by_role(self, user):
-        if user.role == 'RO':
+        if getattr(user, "role", None) == 'RO':
             return redirect('tracking:ro_dashboard')
-        if user.role == 'RA':
+        if getattr(user, "role", None) == 'RA':
             return redirect('tracking:ra_dashboard')
-        if user.role == 'AD':
+        if getattr(user, "role", None) == 'AD':
             return redirect('tracking:choose_dashboard')
         if user.is_superuser:
             return redirect('tracking:ra_dashboard')
@@ -239,14 +239,15 @@ def auto_logout_view(request):
 
 
 # ---------------------- Dashboard Views ----------------------
+
 @login_required
 def choose_dashboard(request):
-    # Allow access if user is AD (PI), RO, or superuser
-    if request.user.role not in ['AD', 'RO','RA'] and not request.user.is_superuser:
+    # Allow access if user is AD (PI), RO, RA, or superuser
+    if getattr(request.user, "role", None) not in ['AD', 'RO', 'RA'] and not request.user.is_superuser:
         return render(
             request,
             'tracking/forbidden.html',
-            {'message': "Only PIs, ROs, or superusers can access this page."}
+            {'message': "Only PIs, ROs, RAs, or superusers can access this page."}
         )
 
     # Superusers see all participants & screenings
@@ -260,10 +261,10 @@ def choose_dashboard(request):
     pending = pending_participants(participants)
     completed = completed_participants(participants)
 
-    # ✅ Total number screened (from ScreeningSession)
+    # Total number screened (from ScreeningSession)
     number_screened = screenings.aggregate(total=Sum('number_screened'))['total'] or 0
 
-    # Keep site_summary for breakdown (eligible remains unchanged)
+    # Site breakdown
     site_summary = (
         screenings.values('site__name')
         .annotate(
@@ -280,21 +281,20 @@ def choose_dashboard(request):
             'participants': participants,
             'pending': pending,
             'completed': completed,
-            'number_screened': number_screened,  #Now available for cards
+            'number_screened': number_screened,
             'site_summary': site_summary,
         }
     )
 
 
-
 @login_required(login_url=reverse_lazy('tracking:ra_login'))
 def ra_dashboard(request):
-    if request.user.role not in ('RA', 'AD') and not request.user.is_superuser:
+    if getattr(request.user, "role", None) not in ('RA', 'AD') and not request.user.is_superuser:
         return render(request, 'tracking/forbidden.html', {'message': "Only RAs, PIs, or superusers can access the dashboard."})
 
     participants = Participant.objects.all() if request.user.is_superuser else Participant.objects.filter(site=request.user.site)
 
-    pending_participants = [p for p in participants if not all([
+    pending_list = [p for p in participants if not all([
         p.monitor_downloaded, p.ultrasound_downloaded, p.case_report_form_uploaded,
         p.video_laryngoscope_uploaded, p.rop_final_report_uploaded,
         p.head_ultrasound_images_uploaded, p.head_ultrasound_report_uploaded,
@@ -302,67 +302,78 @@ def ra_dashboard(request):
         p.admission_notes_day1_uploaded
     ])]
 
-    sorted_participants = sorted(pending_participants, key=lambda p: p.enrollment_date, reverse=True)
+    sorted_participants = sorted(pending_list, key=lambda p: p.enrollment_date, reverse=True)
     return render(request, 'tracking/ra_dashboard.html', {'participants': sorted_participants})
+
 
 @login_required(login_url=reverse_lazy('tracking:ro_login'))
 def ro_dashboard(request):
-    if request.user.role not in ('RO', 'AD') and not request.user.is_superuser:
+    if getattr(request.user, "role", None) not in ('RO', 'AD') and not request.user.is_superuser:
         return render(request, 'tracking/forbidden.html', {'message': "Only ROs, PIs, or superusers can access the dashboard."})
 
     participants = get_user_participants(request.user)
     pending = [p for p in participants if p not in completed_participants(participants)]
-    sorted_participants = sorted(pending, key=lambda p: p.days_remaining)  # removed ()
+    sorted_participants = sorted(pending, key=lambda p: p.days_remaining)
     return render(request, 'tracking/ro_dashboard.html', {'participants': sorted_participants})
 
+
 # ---------------------- Participant Management ----------------------
+
 @login_required
 def register_participant(request):
-    # --- Step 1: Screening form submission ---
-    if request.method == "POST" and "number_screened" in request.POST:
-        screening_form = ScreeningForm(request.POST)
-        if screening_form.is_valid():
-            ScreeningSession.objects.create(
-                ra=request.user,
-                site=request.user.site,
-                date=timezone.localdate(),
-                number_screened=screening_form.cleaned_data["number_screened"],
-                number_eligible=screening_form.cleaned_data["number_eligible"],
-            )
-            # Redirect to participant form (fresh GET request)
-            request.session["screening_done"] = True
-            return redirect("tracking:register_participant")
-        return render(request, "tracking/screening_form.html", {"form": screening_form})
+    """Register a participant (RA/AD or superuser)."""
+    if getattr(request.user, "role", None) not in ('RA', 'AD') and not request.user.is_superuser:
+        return render(
+            request,
+            'tracking/forbidden.html',
+            {'message': "Only RAs, PIs, or superusers can register participants."}
+        )
 
-    # --- Step 2: Participant form submission ---
-    if request.method == "POST" and request.session.get("screening_done"):
-        participant_form = ParticipantForm(request.POST, user=request.user)
-        if participant_form.is_valid():
-            participant = participant_form.save(commit=False)
-            participant.site = request.user.site
+    # Read ?eligible=N query param
+    eligible_qs = request.GET.get("eligible")
+    try:
+        eligible_count = int(eligible_qs) if eligible_qs is not None else None
+    except ValueError:
+        eligible_count = None
+
+    if request.method == 'POST':
+        form = ParticipantForm(request.POST, user=request.user)
+        if form.is_valid():
+            participant = form.save(commit=False)
+
+            # Ensure site assignment
+            if not participant.site:
+                if request.user.is_superuser:
+                    messages.error(request, "Site must be selected for superuser registration.")
+                    return render(
+                        request,
+                        'tracking/participant_form.html',
+                        {'form': form, 'eligible': eligible_count}
+                    )
+                participant.site = request.user.site
+
             participant.save()
-            messages.success(request, "Participant saved successfully.")
+            messages.success(request, f"Participant {participant.study_id} registered.")
 
-            # Redirect to the correct dashboard based on user role
-            if request.user.is_ra:
-                return redirect("tracking:ra_dashboard")
-            elif request.user.is_ro:
-                return redirect("tracking:ro_dashboard")
-            elif request.user.is_pi or request.user.is_superuser:
-                return redirect("tracking:choose_dashboard")
+            # Determine which button was pressed
+            if "add_another" in request.POST:
+                # Stay on the same form for the next participant
+                return redirect(f"{reverse('tracking:register_participant')}?eligible={eligible_count}")
+            else:
+                # Redirect to RA dashboard (or appropriate dashboard)
+                return redirect('tracking:ra_dashboard')
 
-        # Invalid form → show errors
-        return render(request, "tracking/participant_form.html", {"form": participant_form})
+        else:
+            messages.error(request, "Please correct the errors below.")
+    else:
+        form = ParticipantForm(user=request.user)
 
-    # --- GET request ---
-    if request.session.get("screening_done"):
-        # Screening done → show participant form
-        participant_form = ParticipantForm(user=request.user)
-        return render(request, "tracking/participant_form.html", {"form": participant_form})
+    return render(
+        request,
+        'tracking/participant_form.html',
+        {'form': form, 'eligible': eligible_count}
+    )
 
-    # Screening not done → show screening form
-    screening_form = ScreeningForm()
-    return render(request, "tracking/screening_form.html", {"form": screening_form})
 
 
 @login_required
@@ -370,65 +381,65 @@ def participant_detail(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
     if not request.user.is_superuser and participant.site != request.user.site:
         return render(request, 'tracking/forbidden.html', {'message': "You can only view participants from your site."})
-    can_edit = request.user.role in ['AD', 'RO'] or request.user.is_superuser
+    can_edit = (getattr(request.user, "role", None) in ['AD', 'RO']) or request.user.is_superuser
     return render(request, 'tracking/participant_detail.html', {'participant': participant, 'can_edit': can_edit})
 
 
 @login_required
+@login_required
 def update_participant(request, pk):
+    """Handle POST from participant_detail form; save checkboxes + comments."""
     participant = get_object_or_404(Participant, pk=pk)
 
-    # Permission check: RA, RO, AD, or superuser can update
-    if request.user.role not in ('RA', 'RO', 'AD') and not request.user.is_superuser:
-        return render(request, 'tracking/forbidden.html', {
-            'message': "You do not have permission to update this participant."
-        })
-
-    # Optional: Ensure RA/RO/AD can only update participants from their site
-    if request.user.role in ('RA', 'RO', 'AD') and not request.user.is_superuser:
-        if participant.site != request.user.site:
-            return render(request, 'tracking/forbidden.html', {
-                'message': "Access Denied. Participant does not belong to your site."
-            })
+    # Only RO, AD, or superuser can update via this form
+    if not (getattr(request.user, "role", None) in ("RO", "AD") or request.user.is_superuser):
+        return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
 
     if request.method == "POST":
-        # Get form data
-        study_id = request.POST.get("study_id")
-        dob = request.POST.get("date_of_birth")
-        enrollment = request.POST.get("enrollment_date")
+        ro_fields = [
+            ("monitor_downloaded", "monitor_downloaded_comment"),
+            ("ultrasound_downloaded", "ultrasound_downloaded_comment"),
+            ("case_report_form_uploaded", "case_report_form_uploaded_comment"),
+            ("video_laryngoscope_uploaded", "video_laryngoscope_uploaded_comment"),
+            ("rop_final_report_uploaded", "rop_final_report_uploaded_comment"),
+            ("head_ultrasound_images_uploaded", "head_ultrasound_images_uploaded_comment"),
+            ("head_ultrasound_report_uploaded", "head_ultrasound_report_uploaded_comment"),
+            ("cost_effectiveness_data_uploaded", "cost_effectiveness_data_uploaded_comment"),
+            ("blood_culture_done", "blood_culture_done_comment"),
+            ("admission_notes_day1_uploaded", "admission_notes_day1_uploaded_comment"),
+            ("admission_notes_24hr_uploaded", "admission_notes_24hr_uploaded_comment"),
+            ("vital_sign_monitoring_done", "vital_sign_monitoring_done_comment"),
+        ]
 
-        # Update fields if provided
-        if study_id:
-            participant.study_id = study_id
-        if dob:
-            participant.date_of_birth = dob
-        if enrollment:
-            participant.enrollment_date = enrollment
+        for checkbox_field, comment_field in ro_fields:
+            # Save comment (store None if empty so template doesn't show "None")
+            comment_value = (request.POST.get(comment_field) or "").strip()
+            setattr(participant, comment_field, comment_value if comment_value else None)
+
+            # Checkbox is true if explicitly checked OR a comment exists
+            checkbox_value = request.POST.get(checkbox_field)
+            setattr(participant, checkbox_field, bool(checkbox_value) or bool(comment_value))
 
         participant.save()
-        messages.success(request, f"Participant {participant.study_id} updated successfully.")
+        messages.success(request, "Participant record updated successfully.")
 
-        # Redirect based on role
-        if request.user.role == "RO":
-            return redirect('tracking:ro_dashboard')
-        elif request.user.role == "AD" or request.user.is_superuser:
-            return redirect('tracking:choose_dashboard')
-        else:
-            return redirect('tracking:ra_dashboard')
+        # Role-aware redirect (RO -> ro_dashboard; AD or superuser -> choose_dashboard; fallback -> participant detail)
+        if getattr(request.user, "role", None) == "RO":
+            return redirect("tracking:ro_dashboard")
+        if getattr(request.user, "role", None) == "AD" or request.user.is_superuser:
+            return redirect("tracking:choose_dashboard")
+        return redirect("tracking:participant_detail", pk=participant.pk)
 
-    # If GET, redirect to participant detail
-    return redirect('tracking:participant_detail', pk=participant.pk)
+    # On GET, just go back to detail (form lives on detail page)
+    return redirect("tracking:participant_detail", pk=participant.pk)
 
-
-
-
-# ---------------------- Quick Mark Actions ----------------------
+# ---------- Quick Mark Actions ----------
 
 @login_required(login_url=reverse_lazy('tracking:ro_login'))
 def mark_monitor_downloaded(request, pk):
     if request.method == 'POST':
         participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or request.user.role not in ('RO', 'AD')):
+        if not request.user.is_superuser and (participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')):
             return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
         participant.monitor_downloaded = True
         participant.monitor_downloaded_at = timezone.now()
@@ -442,7 +453,7 @@ def mark_monitor_downloaded(request, pk):
 def mark_ultrasound_downloaded(request, pk):
     if request.method == 'POST':
         participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or request.user.role not in ('RO', 'AD')):
+        if not request.user.is_superuser and (participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')):
             return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
         participant.ultrasound_downloaded = True
         participant.ultrasound_downloaded_at = timezone.now()
@@ -456,7 +467,7 @@ def mark_ultrasound_downloaded(request, pk):
 
 @login_required
 def download_completed_pdf(request):
-    if request.user.role != 'AD' and not request.user.is_superuser:
+    if getattr(request.user, "role", None) != 'AD' and not request.user.is_superuser:
         messages.error(request, "Only PIs or superusers can download PDF.")
         return redirect('tracking:choose_dashboard')
 
@@ -519,160 +530,6 @@ def download_completed_pdf(request):
     doc.build(elements)
     return response
 
-# ---------- Participant Management ----------
-
-@login_required(login_url=reverse_lazy('tracking:ra_login'))
-def register_participant(request):
-    # Restrict access
-    if request.user.role not in ('RA', 'AD') and not request.user.is_superuser:
-        return render(
-            request,
-            'tracking/forbidden.html',
-            {'message': "Only RAs, PIs, or superusers can register participants."}
-        )
-
-    # Read ?eligible=N query param
-    eligible_qs = request.GET.get("eligible")
-    try:
-        eligible_count = int(eligible_qs) if eligible_qs is not None else None
-    except ValueError:
-        eligible_count = None
-
-    if request.method == 'POST':
-        form = ParticipantForm(request.POST, user=request.user)
-        if form.is_valid():
-            participant = form.save(commit=False)
-
-            # Ensure site assignment
-            if not participant.site:
-                if request.user.is_superuser:
-                    messages.error(request, "Site must be selected for superuser registration.")
-                    return render(
-                        request,
-                        'tracking/participant_form.html',
-                        {'form': form, 'eligible': eligible_count}
-                    )
-                participant.site = request.user.site
-
-            participant.save()
-            messages.success(request, f"Participant {participant.study_id} registered.")
-            return redirect('tracking:ra_dashboard')
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = ParticipantForm(user=request.user)
-
-    return render(
-        request,
-        'tracking/participant_form.html',
-        {'form': form, 'eligible': eligible_count}
-    )
-
-@login_required
-def participant_detail(request, pk):
-    participant = get_object_or_404(Participant, pk=pk)
-    if not request.user.is_superuser and participant.site != request.user.site:
-        return render(request, 'tracking/forbidden.html', {'message': "You can only view participants from your site."})
-    can_edit = request.user.role in ['AD', 'RO'] or request.user.is_superuser
-    return render(request, 'tracking/participant_detail.html', {'participant': participant, 'can_edit': can_edit})
-
-@login_required
-def update_participant(request, pk):
-    participant = get_object_or_404(Participant, pk=pk)
-
-    # RA: only participants from their site
-    if request.user.role == 'RA' and participant.site != request.user.site:
-        messages.error(request, "Access Denied. You can only modify participants from your site.")
-        return redirect('tracking:ra_dashboard')
-
-    # Block anyone else not allowed
-    if request.user.role not in ('RA', 'RO', 'AD') and not request.user.is_superuser:
-        messages.error(request, "You do not have permission to update this participant.")
-        return redirect('tracking:ra_dashboard')
-
-    if request.method == "POST":
-        # --- Editable Fields ---
-
-        # Study ID
-        study_id = request.POST.get("study_id")
-        if study_id is not None:
-            participant.study_id = study_id.strip()
-
-        # Date of Birth
-        dob_str = request.POST.get("date_of_birth")
-        if dob_str:
-            try:
-                participant.date_of_birth = datetime.strptime(dob_str, "%Y-%m-%d").date()
-            except ValueError:
-                messages.warning(request, "Invalid Date of Birth format. Use YYYY-MM-DD.")
-
-        # Enrollment Date
-        enrollment_str = request.POST.get("enrollment_date")
-        if enrollment_str:
-            try:
-                participant.enrollment_date = datetime.strptime(enrollment_str, "%Y-%m-%d").date()
-            except ValueError:
-                messages.warning(request, "Invalid Enrollment Date format. Use YYYY-MM-DD.")
-
-        # --- Checkboxes (for RO, AD, superuser) ---
-        # RAs do not update checkboxes
-        if request.user.role in ("RO", "AD") or request.user.is_superuser:
-            checkbox_fields = [
-                "monitor_downloaded",
-                "ultrasound_downloaded",
-                "case_report_form_uploaded",
-                "video_laryngoscope_uploaded",
-                "rop_final_report_uploaded",
-                "head_ultrasound_images_uploaded",
-                "head_ultrasound_report_uploaded",
-                "cost_effectiveness_data_uploaded",
-                "blood_culture_done",
-                "admission_notes_day1_uploaded",
-            ]
-            for field in checkbox_fields:
-                setattr(participant, field, field in request.POST)
-
-        participant.save()
-        messages.success(request, f"Participant {participant.study_id} updated successfully.")
-
-        # Redirect based on role
-        if request.user.role == "RA":
-            return redirect('tracking:ra_dashboard')
-        elif request.user.role == "RO":
-            return redirect('tracking:ro_dashboard')
-        elif request.user.role in ("AD",) or request.user.is_superuser:
-            return redirect('tracking:choose_dashboard')
-
-    # GET requests redirect to participant detail page
-    return redirect('tracking:participant_detail', pk=participant.pk)
-
-# ---------- Quick Mark Actions ----------
-
-@login_required(login_url=reverse_lazy('tracking:ro_login'))
-def mark_monitor_downloaded(request, pk):
-    if request.method == 'POST':
-        participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or request.user.role not in ('RO', 'AD')):
-            return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
-        participant.monitor_downloaded = True
-        participant.monitor_downloaded_at = timezone.now()
-        participant.monitor_downloaded_by = request.user
-        participant.save()
-        messages.success(request, f"Monitor download confirmed for {participant.study_id}")
-    return redirect('tracking:ro_dashboard')
-
-@login_required(login_url=reverse_lazy('tracking:ro_login'))
-def mark_ultrasound_downloaded(request, pk):
-    if request.method == 'POST':
-        participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or request.user.role not in ('RO', 'AD')):
-            return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
-        participant.ultrasound_downloaded = True
-        participant.ultrasound_downloaded_at = timezone.now()
-        participant.ultrasound_downloaded_by = request.user
-        participant.save()
-        messages.success(request, f"Ultrasound download confirmed for {participant.study_id}")
-    return redirect('tracking:ro_dashboard')
 
 # ---------- Blog Page ----------
 
@@ -684,10 +541,13 @@ def blog(request):
     ]
     return render(request, 'tracking/blog.html', {'posts': posts})
 
+
 def csrf_failure(request, reason=""):
     return render(request, "csrf_failure.html", status=403)
 
-#-----------------Screening View----------------------
+
+# ----------------- Screening View ----------------------
+
 @login_required()
 def screening_view(request):
     if request.method == "POST":
@@ -698,13 +558,24 @@ def screening_view(request):
             messages.error(request, "Please enter valid whole numbers.")
             return HttpResponseRedirect(reverse("tracking:screening"))
 
+        # Screening date (default today if not provided)
+        screening_date = request.POST.get("screening_date")
+        if not screening_date:
+            from datetime import date
+            screening_date = date.today()
+        else:
+            try:
+                from datetime import datetime
+                screening_date = datetime.strptime(screening_date, "%Y-%m-%d").date()
+            except ValueError:
+                messages.error(request, "Invalid date format.")
+                return HttpResponseRedirect(reverse("tracking:screening"))
+
         # Determine site
         site = None
-        if request.user.role in ["RA", "RO"] and request.user.site:
-            # RA and RO → use their site directly
+        if getattr(request.user, "role", None) in ["RA", "RO"] and request.user.site:
             site = request.user.site
-        elif request.user.is_superuser or request.user.role == "AD":
-            # Superuser/AD → must pick site from dropdown
+        elif request.user.is_superuser or getattr(request.user, "role", None) == "AD":
             site_id = request.POST.get("site_id")
             if site_id:
                 try:
@@ -716,12 +587,13 @@ def screening_view(request):
                 messages.error(request, "No site found. Please select a site.")
                 return HttpResponseRedirect(reverse("tracking:screening"))
 
-        # Save the screening session
+        # Save the screening session (use model field `date`)
         ScreeningSession.objects.create(
             ra=request.user,
             site=site,
             number_screened=number_screened,
             number_eligible=number_eligible,
+            date=screening_date,   # ✅ updated to match your model field
         )
 
         messages.success(
@@ -735,19 +607,49 @@ def screening_view(request):
             return HttpResponseRedirect(url)
 
         # Otherwise, go back to dashboard
-        if request.user.role == "RA":
+        if getattr(request.user, "role", None) == "RA":
             return HttpResponseRedirect(reverse("tracking:ra_dashboard"))
-        if request.user.role == "RO":
+        if getattr(request.user, "role", None) == "RO":
             return HttpResponseRedirect(reverse("tracking:ro_dashboard"))
-        return HttpResponseRedirect(reverse("choose_dashboard"))
+        return HttpResponseRedirect(reverse("tracking:choose_dashboard"))
 
     # --- GET request ---
     context = {}
-    if request.user.is_superuser or request.user.role == "AD":
+    if request.user.is_superuser or getattr(request.user, "role", None) == "AD":
         context["sites"] = Site.objects.all()
 
     return render(request, "tracking/screening_form.html", context)
 
+#--------------------------------------------------------------------
+#DAILY ACTIVITY
+#--------------------------------------------------------------------
+@login_required
+def daily_log_view(request):
+    # Handle POST submission
+    if request.method == 'POST':
+        form = DailyLogForm(request.POST)
+        if form.is_valid():
+            log = form.save(commit=False)
+            log.user = request.user
+            log.save()
+            return redirect('tracking:daily_logs')
+    else:
+        form = DailyLogForm(initial={'date': timezone.localdate()})
 
+    # Filter logs: show only current user's logs
+    logs = DailyLog.objects.filter(user=request.user)
 
+    # Get date filters from request (optional)
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
 
+    if start_date and end_date:
+        logs = logs.filter(date__range=[start_date, end_date])
+
+    context = {
+        'form': form,
+        'logs': logs,              # keep your original key name
+        'start_date': start_date,  # added for header printing
+        'end_date': end_date,      # added for header printing
+    }
+    return render(request, 'tracking/daily_logs.html', context)
