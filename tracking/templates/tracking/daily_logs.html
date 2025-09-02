@@ -2,15 +2,17 @@
 {% load widget_tweaks %}
 
 {% block content %}
-<div class="container-fluid p-0">
+<div class="container-fluid p-0" style="margin-top:-10px;">  <!-- Pull content closer to navbar -->
 
   <!-- Info Banner styled like Bootstrap alert -->
-  <div id="infoBanner" class="alert alert-success alert-dismissible fade show rounded-3 mb-3 shadow-sm text-center" role="alert" style="font-size:0.95rem; padding: 8px 12px;">
-    This page allows you to record and review your daily activities for the Preterm Africa Study. Use the left form to log your activities and print button for printing and filters.
+  <div id="infoBanner" class="alert alert-success alert-dismissible fade show rounded-3 shadow-sm text-center"
+       role="alert" style="font-size:0.95rem; padding: 8px 12px; margin-top:0;">
+    This page allows you to record and review your daily activities for the Preterm Africa Study.
+    Use the left form to log your activities and print button for printing and filters.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
 
-  <div class="container-fluid mt-3">
+  <div class="container-fluid">
     <div class="row gx-4">
 
       <!-- LEFT PANEL: Form -->
@@ -29,7 +31,7 @@
                 {{ form.date|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
                 <label>Date</label>
                 {% if form.date.errors %}
-                <div class="text-danger small">{{ form.date.errors|striptags }}</div>
+                  <div class="text-danger small">{{ form.date.errors|striptags }}</div>
                 {% endif %}
               </div>
 
@@ -37,28 +39,28 @@
                 {{ form.title|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
                 <label>Title</label>
                 {% if form.title.errors %}
-                <div class="text-danger small">{{ form.title.errors|striptags }}</div>
+                  <div class="text-danger small">{{ form.title.errors|striptags }}</div>
                 {% endif %}
               </div>
 
               <div class="form-floating mb-3">
-                {{ form.tag|add_class:"form-select form-select-sm shadow-sm border border-secondary" }}
+                {{ form.tag|add_class:"form-select form-select-sm shadow-sm border border-secondary text-muted" }}
                 <label>Tag</label>
                 {% if form.tag.errors %}
-                <div class="text-danger small">{{ form.tag.errors|striptags }}</div>
+                  <div class="text-danger small">{{ form.tag.errors|striptags }}</div>
                 {% endif %}
               </div>
 
               <!-- Large auto-expanding content field -->
               <div class="form-floating mb-3">
-                {{ form.content|add_class:"form-control shadow-sm border border-secondary" }}
+                {{ form.content|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
                 <label>Content</label>
                 {% if form.content.errors %}
-                <div class="text-danger small">{{ form.content.errors|striptags }}</div>
+                  <div class="text-danger small">{{ form.content.errors|striptags }}</div>
                 {% endif %}
               </div>
 
-              <div class="d-grid mt-3">
+              <div class="d-grid">
                 <button type="submit" class="btn btn-gradient btn-lg fw-semibold shadow-sm">
                   + Add New Activity
                 </button>
@@ -73,35 +75,43 @@
         <div class="d-flex flex-column gap-3">
 
           <!-- Filter & Search Bar -->
-          <div class="d-flex mb-3 gap-2">
-            <input type="text" id="searchInput" placeholder="Search by title or content" class="form-control shadow-sm rounded-3 border border-secondary">
-            <input type="date" id="filterDate" class="form-control shadow-sm rounded-3 border border-secondary">
-            <select id="filterTag" class="form-select shadow-sm rounded-3 border border-secondary">
-              <option value="">All Tags</option>
-              <option value="OBS">Observation</option>
-              <option value="EQP">Meeting</option>
-              <option value="REM">Reminder</option>
-              <option value="MISC">Misc</option>
-            </select>
-            <button class="btn btn-outline-success" id="printCommentsBtn">📝 Print</button>
+          <div class="d-flex mb-3 gap-2 align-items-center flex-wrap">
+            <input type="text" id="searchInput" placeholder="Search by title or content"
+                   class="form-control form-control-sm shadow-sm rounded-3 border border-secondary" style="flex:1; min-width:180px;">
+            <input type="date" id="filterDate" placeholder="Filter by date"
+                   class="form-control form-control-sm shadow-sm rounded-3 border border-secondary" style="flex:1; min-width:160px;">
+
+            <!-- Tag stickers container -->
+            <div class="tags-container flex-wrap">
+                <span class="tag" data-tag="">All Tags</span>
+                <span class="tag" data-tag="NOT">Notes</span>
+                <span class="tag" data-tag="MEE">Meetings</span>
+                <span class="tag" data-tag="URG">Urgent</span>
+                <span class="tag" data-tag="OBS">Observation</span>
+                <span class="tag" data-tag="PEN">Pending</span>
+                <span class="tag" data-tag="COM">Completed</span>
+                <span class="tag" data-tag="ANY">Any Other</span>
+            </div>
+
+            <button class="btn btn-outline-success ms-auto" id="printCommentsBtn">📝Print</button>
           </div>
 
           <!-- Logs as sticky notes -->
           <div class="d-flex flex-wrap gap-3">
             {% for log in logs %}
-            <div class="log-card"
-                 data-title="{{ log.title|lower }}"
-                 data-content="{{ log.content|lower }}"
-                 data-tag="{{ log.tag }}"
-                 data-date="{{ log.date|date:'Y-m-d' }}">
+              <div class="log-card"
+                   data-title="{{ log.title|lower }}"
+                   data-content="{{ log.content|lower }}"
+                   data-tag="{{ log.tag }}"
+                   data-date="{{ log.date|date:'Y-m-d' }}">
                 <div class="log-title">{{ log.title|default:"(No Title)" }}</div>
                 <div class="log-date">{{ log.date }}</div>
                 <div class="log-content">{{ log.content|linebreaksbr }}</div>
-            </div>
+              </div>
             {% empty %}
-            <div class="text-center text-muted my-4 w-100">
-              No logs yet. Start by adding your first entry!
-            </div>
+              <div class="text-center text-muted my-4 w-100">
+                No logs yet. Start by adding your first entry!
+              </div>
             {% endfor %}
           </div>
 
@@ -111,6 +121,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Styles -->
 <style>
@@ -148,6 +159,20 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.15);
   }
 
+  /* Uniform font size for inputs, selects, and labels */
+  .form-control-sm,
+  .form-select-sm,
+  .form-floating > label {
+      font-size: 0.9rem !important;
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+  }
+
+  /* Greyed-out placeholder style for first tag */
+  select.form-select-sm option[value=""] {
+      color: #6c757d;
+  }
+
   .form-control, .form-select {
       background: #ffffff;
       box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
@@ -156,6 +181,29 @@
   .form-control:focus, .form-select:focus {
       box-shadow: 0 0 0 3px rgba(66,133,244,0.25);
       transform: scale(1.02);
+  }
+
+  .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      align-items: center;
+  }
+  .tag {
+      background: #f0f0f0;
+      border-radius: 12px;
+      padding: 2px 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+  }
+  .tag:hover {
+      background: #007bff;
+      color: #fff;
+  }
+  .tag.active {
+      background: #007bff;
+      color: #fff;
   }
 
   .log-card {
@@ -192,10 +240,14 @@
       white-space: pre-wrap;
   }
 
-  .log-card[data-tag="OBS"] { background-color: #ffefc1; }
-  .log-card[data-tag="EQP"] { background-color: #c1ffe0; }
-  .log-card[data-tag="REM"] { background-color: #ffc1c1; }
-  .log-card[data-tag="MISC"]{ background-color: #c1d4ff; }
+  /* Sticky note colors per tag */
+  .log-card[data-tag="OBS"] { background-color: #ffefc1; }  /* yellow */
+  .log-card[data-tag="COM"] { background-color: #c1ffd7; }  /* green */
+  .log-card[data-tag="PEN"] { background-color: #ffe4c1; }  /* peach */
+  .log-card[data-tag="URG"] { background-color: #ffc1c1; }  /* red */
+  .log-card[data-tag="NOT"] { background-color: #c1d4ff; }  /* blue */
+  .log-card[data-tag="MEE"] { background-color: #e0c1ff; }  /* lavender */
+  .log-card[data-tag="ANY"] { background-color: #f5f5f5; }  /* grey */
 </style>
 
 <!-- Scripts -->
@@ -221,13 +273,14 @@
 
   const searchInput = document.getElementById('searchInput');
   const filterDate = document.getElementById('filterDate'); // no default value
-  const filterTag = document.getElementById('filterTag');
   const logCards = document.querySelectorAll('.log-card');
+  const tags = document.querySelectorAll('.tag');
+  let activeTag = "";
 
   function filterLogs() {
     const query = searchInput.value.toLowerCase();
     const dateValue = filterDate.value;
-    const tagValue = filterTag.value;
+    const tagValue = activeTag;
 
     logCards.forEach(card => {
       const title = card.dataset.title;
@@ -246,7 +299,19 @@
 
   searchInput.addEventListener('input', filterLogs);
   filterDate.addEventListener('change', filterLogs);
-  filterTag.addEventListener('change', filterLogs);
+
+  tags.forEach(tag => {
+    tag.addEventListener('click', () => {
+      tags.forEach(t => t.classList.remove('active'));
+      if(activeTag === tag.dataset.tag) {
+        activeTag = "";
+      } else {
+        activeTag = tag.dataset.tag;
+        tag.classList.add('active');
+      }
+      filterLogs();
+    });
+  });
 
   // Trigger filtering on page load
   filterLogs();

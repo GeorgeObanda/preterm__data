@@ -153,12 +153,34 @@ class SignupForm(UserCreationForm):
         return user
 
 class DailyLogForm(forms.ModelForm):
+    TAG_CHOICES = [
+        ("", "Select a tag"),
+        ("NOT", "Notes"),
+        ("MEE", "Meetings"),
+        ("URG", "Urgent"),
+        ("OBS", "Observation"),
+        ("PEN", "Pending"),
+        ("COM", "Completed"),
+        ("ANY", "Any Other"),
+    ]
+
+    tag = forms.ChoiceField(
+        choices=TAG_CHOICES,
+        widget=forms.Select(
+            attrs={
+                "class": "form-select form-select-lg",
+                "required": True,
+                "oninvalid": "this.setCustomValidity('Please select a tag')",
+                "oninput": "this.setCustomValidity('')",
+            }
+        ),
+    )
+
     class Meta:
         model = DailyLog
-        fields = ['date', 'title', 'tag', 'content']
+        fields = ["date", "title", "tag", "content"]
         widgets = {
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control form-control-lg'}),
-            'title': forms.TextInput(attrs={'class': 'form-control form-control-lg', 'placeholder': 'Short title'}),
-            'tag': forms.Select(attrs={'class': 'form-select form-select-lg'}),
-            'content': forms.Textarea(attrs={'class': 'form-control form-control-lg', 'rows': 4, 'placeholder': 'Write your observation here...'}),
+            "date": forms.DateInput(attrs={"type": "date", "class": "form-control form-control-lg"}),
+            "title": forms.TextInput(attrs={"class": "form-control form-control-lg", "placeholder": "Short title"}),
+            "content": forms.Textarea(attrs={"class": "form-control form-control-lg", "rows": 4, "placeholder": "Write your observation here..."}),
         }

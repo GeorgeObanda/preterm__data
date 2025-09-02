@@ -207,10 +207,14 @@ class NotificationLog(models.Model):
 #------------Daily Log----------------
 class DailyLog(models.Model):
     TAG_CHOICES = [
-        ('OBS', 'Observation'),
-        ('EQP', 'Equipment'),
-        ('REM', 'Reminder'),
-        ('MISC', 'Miscellaneous'),
+        ("", "Select a tag"),
+        ("NOT", "Notes"),
+        ("MEE", "Meetings"),
+        ("URG", "Urgent"),
+        ("OBS", "Observation"),
+        ("PEN", "Pending"),
+        ("COM", "Completed"),
+        ("ANY", "Any Other"),
     ]
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
