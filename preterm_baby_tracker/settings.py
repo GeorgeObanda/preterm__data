@@ -10,6 +10,7 @@ SECRET_KEY = 'django-insecure-s$)!c8vhroeho_n)i*c$19iuml21!=g4!s@3&89g#7^ey7tj5=
 DEBUG = True
 
 # Restrict allowed hosts to your deployed Render app
+# Restrict allowed hosts to your deployed Render app
 ALLOWED_HOSTS = [
     'preterm-data-tracker-9zcd.onrender.com',
     'pretermafricastudy.org',
@@ -17,6 +18,7 @@ ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
 ]
+
 
 # Installed apps
 INSTALLED_APPS = [
@@ -91,34 +93,18 @@ TIME_ZONE = 'Africa/Nairobi'
 USE_I18N = True
 USE_TZ = True
 
-# -------------------------------
 # Static files
-# -------------------------------
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]           # Your source static files
 STATIC_ROOT = BASE_DIR / "staticfiles"             # collectstatic target
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-# -------------------------------
-# Media files (uploads like attachments)
-# -------------------------------
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / "media"
-
-# -------------------------------
-# Default primary key field type
-# -------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# -------------------------------
 # Session management (auto logout after 10 min idle)
-# -------------------------------
 SESSION_COOKIE_AGE = 600          # 10 minutes
 SESSION_SAVE_EVERY_REQUEST = True  # Sliding expiry
 
-# -------------------------------
 # Email settings (using Gmail SMTP)
-# -------------------------------
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_USE_TLS = True
@@ -127,15 +113,14 @@ EMAIL_HOST_USER = 'barnes.okoth@gmail.com'
 EMAIL_HOST_PASSWORD = 'ljet xecf wnns wxtk'  # Gmail App Password
 DEFAULT_FROM_EMAIL = 'George Obanda <barnes.okoth@gmail.com>'
 
-# -------------------------------
 # Cron jobs for reminders (run every day at 10 AM Nairobi time)
-# -------------------------------
 CRONJOBS = [
     ('0 7 * * *', 'django.core.management.call_command', ['send_reminders']),  # 7 AM UTC = 10 AM Nairobi
 ]
 
-# -------------------------------
+# WhiteNoise for efficient static file handling
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 # Site URL for login links in reminder emails
-# -------------------------------
 SITE_URL = "https://preterm-data-tracker-9zcd.onrender.com"
 CSRF_FAILURE_VIEW = 'tracking.views.csrf_failure'

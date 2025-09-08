@@ -53,6 +53,9 @@ class ScreeningSession(models.Model):
 # -----------------------
 # Participant Model
 # -----------------------
+# -----------------------
+# Participant Model
+# -----------------------
 class Participant(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE)
     screening_session = models.ForeignKey(
@@ -92,10 +95,6 @@ class Participant(models.Model):
 
     video_laryngoscope_uploaded = models.BooleanField(default=False)
     video_laryngoscope_uploaded_comment = models.TextField(blank=True, null=True)
-
-    # ✅ NEW: ROP Exam separate from report
-    rop_exam_done = models.BooleanField(default=False)
-    rop_exam_done_comment = models.TextField(blank=True, null=True)
 
     rop_final_report_uploaded = models.BooleanField(default=False)
     rop_final_report_uploaded_comment = models.TextField(blank=True, null=True)
@@ -159,7 +158,10 @@ class Participant(models.Model):
             return 'overdue'
 
     def is_completed(self):
-        """Check if all required downloads/uploads are done."""
+        """
+        Check if all required downloads/uploads are done.
+        An item is considered complete if either the checkbox is True or a comment exists.
+        """
         required_items = [
             ('monitor_downloaded', 'monitor_downloaded_comment'),
             ('ultrasound_downloaded', 'ultrasound_downloaded_comment'),
@@ -167,11 +169,10 @@ class Participant(models.Model):
             ('head_ultrasound_report_uploaded', 'head_ultrasound_report_uploaded_comment'),
             ('case_report_form_uploaded', 'case_report_form_uploaded_comment'),
             ('video_laryngoscope_uploaded', 'video_laryngoscope_uploaded_comment'),
-            # ✅ Exam and report are checked separately
-            ('rop_exam_done', 'rop_exam_done_comment'),
             ('rop_final_report_uploaded', 'rop_final_report_uploaded_comment'),
             ('cost_effectiveness_data_uploaded', 'cost_effectiveness_data_uploaded_comment'),
             ('admission_notes_day1_uploaded', 'admission_notes_day1_uploaded_comment'),
+            # include other items if needed
         ]
 
         for checkbox_field, comment_field in required_items:
@@ -179,32 +180,10 @@ class Participant(models.Model):
                 return False
         return True
 
-    # -----------------------
-    # ROP Exam Helpers
-    # -----------------------
-    @property
-    def rop_due_date(self):
-        """ROP exam is due exactly 28 days after enrollment."""
-        if self.enrollment_date:
-            return self.enrollment_date + timedelta(days=28)
-        return None
-
-    @property
-    def rop_status(self):
-        """Return a clear status message for ROP exam timing."""
-        if not self.rop_due_date:
-            return "ROP exam due date not available"
-        today = timezone.localdate()
-        if self.rop_exam_done:
-            return "✅ Exam done"
-        if self.rop_due_date < today:
-            return f"❌ Exam overdue (was due {self.rop_due_date.strftime('%b %d, %Y')})"
-        elif self.rop_due_date == today:
-            return "⚠️ Exam due today"
-        return f"✅ Exam due {self.rop_due_date.strftime('%b %d, %Y')}"
-
     def __str__(self):
         return f"{self.study_id} ({self.site.name})"
+
+
 
 # -----------------------
 # Notification Log
@@ -241,21 +220,13 @@ class DailyLog(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     date = models.DateField(default=timezone.localdate)
     title = models.CharField(max_length=100, blank=True, null=True)
-    tag = models.CharField(max_length=4, choices=TAG_CHOICES, default="NOT")
+    tag = models.CharField(max_length=4, choices=TAG_CHOICES, default='MISC')
     content = models.TextField()
-
-    # ✅ New field for files/images
-    attachment = models.FileField(
-        upload_to="daily_logs/",
-        blank=True,
-        null=True
-    )
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-date", "-created_at"]
+        ordering = ['-date', '-created_at']
 
     def __str__(self):
         return f"{self.user.username} - {self.date} - {self.title or 'No Title'}"

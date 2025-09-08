@@ -1,6 +1,4 @@
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
 from . import views
 
 app_name = 'tracking'
@@ -40,7 +38,3 @@ urlpatterns = [
     # Daily Logs (user-specific)
     path('daily-logs/', views.daily_log_view, name='daily_logs'),
 ]
-
-# Serve media files (attachments) in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

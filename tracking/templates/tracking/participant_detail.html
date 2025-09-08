@@ -38,35 +38,6 @@
                 </ul>
             </div>
 
-            <!-- ROP Exam Info -->
-            <div class="card mb-4 border-danger shadow-sm">
-                <div class="card-header bg-danger text-white fw-bold">ROP Exam</div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between">
-                        ROP Exam Due Date:
-                        <span class="text-secondary">
-                            {% if participant.rop_due_date %}
-                                {{ participant.rop_due_date|date:"F j, Y" }}
-                            {% else %}
-                                Not available
-                            {% endif %}
-                        </span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between">
-                        ROP Exam Status:
-                        {% if "Overdue" in participant.rop_status %}
-                            <span class="badge bg-danger fs-6">{{ participant.rop_status }}</span>
-                        {% elif "due in" in participant.rop_status %}
-                            <span class="badge bg-warning text-dark fs-6">{{ participant.rop_status }}</span>
-                        {% elif "due today" in participant.rop_status %}
-                            <span class="badge bg-primary fs-6">{{ participant.rop_status }}</span>
-                        {% else %}
-                            <span class="badge bg-success fs-6">{{ participant.rop_status }}</span>
-                        {% endif %}
-                    </li>
-                </ul>
-            </div>
-
             {% if can_edit %}
             <form method="post" action="{% url 'tracking:update_participant' participant.pk %}">
                 {% csrf_token %}
