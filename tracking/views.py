@@ -386,9 +386,8 @@ def participant_detail(request, pk):
 
 
 @login_required
-@login_required
 def update_participant(request, pk):
-    """Handle POST from participant_detail form; save checkboxes + comments."""
+    """Handle POST from participant_detail form; save checkboxes + comments (ROP Exam special rule)."""
     participant = get_object_or_404(Participant, pk=pk)
 
     # Only RO, AD, or superuser can update via this form
@@ -401,7 +400,6 @@ def update_participant(request, pk):
             ("ultrasound_downloaded", "ultrasound_downloaded_comment"),
             ("case_report_form_uploaded", "case_report_form_uploaded_comment"),
             ("video_laryngoscope_uploaded", "video_laryngoscope_uploaded_comment"),
-            ("rop_final_report_uploaded", "rop_final_report_uploaded_comment"),
             ("head_ultrasound_images_uploaded", "head_ultrasound_images_uploaded_comment"),
             ("head_ultrasound_report_uploaded", "head_ultrasound_report_uploaded_comment"),
             ("cost_effectiveness_data_uploaded", "cost_effectiveness_data_uploaded_comment"),
@@ -411,19 +409,28 @@ def update_participant(request, pk):
             ("vital_sign_monitoring_done", "vital_sign_monitoring_done_comment"),
         ]
 
+        # 🔹 Normal fields: checkbox OR comment = mark as complete
         for checkbox_field, comment_field in ro_fields:
-            # Save comment (store None if empty so template doesn't show "None")
             comment_value = (request.POST.get(comment_field) or "").strip()
             setattr(participant, comment_field, comment_value if comment_value else None)
 
-            # Checkbox is true if explicitly checked OR a comment exists
             checkbox_value = request.POST.get(checkbox_field)
             setattr(participant, checkbox_field, bool(checkbox_value) or bool(comment_value))
+
+        # 🔹 Special case: ROP Exam (must be checked, comments do NOT count)
+        rop_comment = (request.POST.get("rop_exam_comment") or "").strip()
+        participant.rop_exam_comment = rop_comment if rop_comment else None
+        participant.rop_exam_done = bool(request.POST.get("rop_exam_done"))
+
+        # 🔹 Special case: ROP Final Report (must be checked, comments do NOT count)
+        rop_final_comment = (request.POST.get("rop_final_report_uploaded_comment") or "").strip()
+        participant.rop_final_report_uploaded_comment = rop_final_comment if rop_final_comment else None
+        participant.rop_final_report_uploaded = bool(request.POST.get("rop_final_report_uploaded"))
 
         participant.save()
         messages.success(request, "Participant record updated successfully.")
 
-        # Role-aware redirect (RO -> ro_dashboard; AD or superuser -> choose_dashboard; fallback -> participant detail)
+        # Role-aware redirect
         if getattr(request.user, "role", None) == "RO":
             return redirect("tracking:ro_dashboard")
         if getattr(request.user, "role", None) == "AD" or request.user.is_superuser:
@@ -432,6 +439,8 @@ def update_participant(request, pk):
 
     # On GET, just go back to detail (form lives on detail page)
     return redirect("tracking:participant_detail", pk=participant.pk)
+
+
 
 # ---------- Quick Mark Actions ----------
 
@@ -532,7 +541,6 @@ def download_completed_pdf(request):
 
 
 # ---------- Blog Page ----------
-
 def blog(request):
     posts = [
         {'title': 'Preterm Study Brochure', 'description': 'Download our study brochure with details about recruitment and protocol.', 'link': '/static/docs/preterm_brochure.pdf'},
@@ -625,9 +633,8 @@ def screening_view(request):
 #--------------------------------------------------------------------
 @login_required
 def daily_log_view(request):
-    # Handle POST submission
     if request.method == 'POST':
-        form = DailyLogForm(request.POST)
+        form = DailyLogForm(request.POST, request.FILES)  # include request.FILES
         if form.is_valid():
             log = form.save(commit=False)
             log.user = request.user
@@ -636,10 +643,8 @@ def daily_log_view(request):
     else:
         form = DailyLogForm(initial={'date': timezone.localdate()})
 
-    # Filter logs: show only current user's logs
     logs = DailyLog.objects.filter(user=request.user)
 
-    # Get date filters from request (optional)
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
 
@@ -648,8 +653,9 @@ def daily_log_view(request):
 
     context = {
         'form': form,
-        'logs': logs,              # keep your original key name
-        'start_date': start_date,  # added for header printing
-        'end_date': end_date,      # added for header printing
+        'logs': logs,
+        'start_date': start_date,
+        'end_date': end_date,
     }
     return render(request, 'tracking/daily_logs.html', context)
+

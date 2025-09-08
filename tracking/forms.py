@@ -178,9 +178,11 @@ class DailyLogForm(forms.ModelForm):
 
     class Meta:
         model = DailyLog
-        fields = ["date", "title", "tag", "content"]
+        fields = ["date", "title", "tag", "attachment", "content"]  # ✅ added attachment here
         widgets = {
             "date": forms.DateInput(attrs={"type": "date", "class": "form-control form-control-lg"}),
             "title": forms.TextInput(attrs={"class": "form-control form-control-lg", "placeholder": "Short title"}),
+            "attachment": forms.ClearableFileInput(attrs={"class": "form-control form-control-lg"}),  # ✅ add widget
             "content": forms.Textarea(attrs={"class": "form-control form-control-lg", "rows": 4, "placeholder": "Write your observation here..."}),
         }
+

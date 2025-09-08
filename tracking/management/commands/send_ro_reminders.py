@@ -16,29 +16,55 @@ class Command(BaseCommand):
 
         # Collect missing items per participant
         for p in participants:
-            days = p.days_remaining  # ✅ field, not a method
-            missing_items = [
-                label for label, status in {
-                    "Monitor Data": p.monitor_downloaded,
-                    "Ultrasound Data": p.ultrasound_downloaded,
-                    "Case Report Form": p.case_report_form_uploaded,
-                    "Video Laryngoscope": p.video_laryngoscope_uploaded,
-                    "ROP Final Report": p.rop_final_report_uploaded,
-                    "Head US Images": p.head_ultrasound_images_uploaded,
-                    "Head US Report": p.head_ultrasound_report_uploaded,
-                    "Cost Effectiveness Data": p.cost_effectiveness_data_uploaded,
-                    "Blood Culture": p.blood_culture_done,
-                    "Admission Notes Day 1": p.admission_notes_day1_uploaded,
-                }.items() if not status
-            ]
+            days = p.days_remaining
+            missing_items = []
+
+            # ✅ Normal items (comment OR checkbox counts as complete)
+            if not (p.monitor_downloaded or p.monitor_downloaded_comment):
+                missing_items.append("Monitor Data")
+            if not (p.ultrasound_downloaded or p.ultrasound_downloaded_comment):
+                missing_items.append("Ultrasound Data")
+            if not (p.case_report_form_uploaded or p.case_report_form_uploaded_comment):
+                missing_items.append("Case Report Form")
+            if not (p.video_laryngoscope_uploaded or p.video_laryngoscope_uploaded_comment):
+                missing_items.append("Video Laryngoscope")
+
+            # ✅ Special: ROP Exam (must be checked, comments don’t count)
+            if not getattr(p, "rop_exam_done", False):
+                missing_items.append("ROP Exam")
+
+            # ✅ Special: ROP Final Report (must be checked, comments don’t count)
+            if getattr(p, "rop_exam_done", False):  # only relevant if exam already done
+                if not p.rop_final_report_uploaded:
+                    missing_items.append("ROP Final Report")
+
+            # ✅ Normal items again
+            if not (p.head_ultrasound_images_uploaded or p.head_ultrasound_images_uploaded_comment):
+                missing_items.append("Head US Images")
+            if not (p.head_ultrasound_report_uploaded or p.head_ultrasound_report_uploaded_comment):
+                missing_items.append("Head US Report")
+            if not (p.cost_effectiveness_data_uploaded or p.cost_effectiveness_data_uploaded_comment):
+                missing_items.append("Cost Effectiveness Data")
+            if not (p.blood_culture_done or p.blood_culture_done_comment):
+                missing_items.append("Blood Culture")
+            if not (p.admission_notes_day1_uploaded or p.admission_notes_day1_uploaded_comment):
+                missing_items.append("Admission Notes Day 1")
 
             if not missing_items:
                 continue
 
+            # Add explicit ROP due note
+            rop_note = ""
+            if "ROP Exam" in missing_items:
+                if p.rop_due_date:
+                    rop_note = f"<br><small style='color:#d9534f;'>ROP Exam due: {p.rop_due_date}</small>"
+                else:
+                    rop_note = "<br><small style='color:#d9534f;'>ROP Exam due date not available</small>"
+
             row = f"""
             <tr>
                 <td style="padding:8px; border:1px solid #ddd;">{p.study_id}</td>
-                <td style="padding:8px; border:1px solid #ddd;">{', '.join(missing_items)}</td>
+                <td style="padding:8px; border:1px solid #ddd;">{', '.join(missing_items)}{rop_note}</td>
                 <td style="padding:8px; text-align:center; border:1px solid #ddd;">{days if days >= 0 else 'Overdue'}</td>
             </tr>
             """
@@ -107,7 +133,7 @@ class Command(BaseCommand):
                     for r in reminders["due"]:
                         NotificationLog.objects.create(participant=r[3], notification_type='DAILY_PROMPT', recipient=user)
                         if user.is_superuser and user.role == "PI":
-                            critical_items = [i for i in ['Ultrasound Downloaded','Blood Culture','ROP Final Report'] if i in r[4]]
+                            critical_items = [i for i in ['Ultrasound Data','Blood Culture','ROP Exam','ROP Final Report'] if i in r[4]]
                             if critical_items:
                                 critical_html = build_html_table(
                                     [f"<tr><td>{r[3].study_id}</td><td>{', '.join(critical_items)}</td><td>{r[2] if r[2]>=0 else 'Overdue'}</td></tr>"],
@@ -131,7 +157,7 @@ class Command(BaseCommand):
                 for r in reminders["overdue"]:
                     NotificationLog.objects.create(participant=r[3], notification_type='OVERDUE_ALERT', recipient=user)
                     if user.is_superuser and user.role == "PI":
-                        critical_items = [i for i in ['Ultrasound Downloaded','Blood Culture','ROP Final Report'] if i in r[4]]
+                        critical_items = [i for i in ['Ultrasound Data','Blood Culture','ROP Exam','ROP Final Report'] if i in r[4]]
                         if critical_items:
                             critical_html = build_html_table(
                                 [f"<tr><td>{r[3].study_id}</td><td>{', '.join(critical_items)}</td><td>{r[2] if r[2]>=0 else 'Overdue'}</td></tr>"],

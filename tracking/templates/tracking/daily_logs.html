@@ -23,7 +23,8 @@
           </div>
           <div class="card-body">
 
-            <form method="post" novalidate>
+            <!-- Add enctype for file uploads -->
+            <form method="post" enctype="multipart/form-data" novalidate>
               {% csrf_token %}
 
               <!-- Small metadata fields -->
@@ -48,6 +49,15 @@
                 <label>Tag</label>
                 {% if form.tag.errors %}
                   <div class="text-danger small">{{ form.tag.errors|striptags }}</div>
+                {% endif %}
+              </div>
+
+              <!-- 🔹 File Upload Field -->
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Attachment (optional)</label>
+                {{ form.attachment|add_class:"form-control form-control-sm shadow-sm border border-secondary" }}
+                {% if form.attachment.errors %}
+                  <div class="text-danger small">{{ form.attachment.errors|striptags }}</div>
                 {% endif %}
               </div>
 
@@ -107,6 +117,14 @@
                 <div class="log-title">{{ log.title|default:"(No Title)" }}</div>
                 <div class="log-date">{{ log.date }}</div>
                 <div class="log-content">{{ log.content|linebreaksbr }}</div>
+
+                {% if log.attachment %}
+                  <div class="mt-2">
+                    <a href="{{ log.attachment.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                      📎 View Attachment
+                    </a>
+                  </div>
+                {% endif %}
               </div>
             {% empty %}
               <div class="text-center text-muted my-4 w-100">
@@ -272,7 +290,7 @@
   }
 
   const searchInput = document.getElementById('searchInput');
-  const filterDate = document.getElementById('filterDate'); // no default value
+  const filterDate = document.getElementById('filterDate');
   const logCards = document.querySelectorAll('.log-card');
   const tags = document.querySelectorAll('.tag');
   let activeTag = "";
