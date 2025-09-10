@@ -9,23 +9,26 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect
+from django.db.models import Q, Sum
+from django.core.exceptions import ValidationError
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle
-from django.db.models import Q, Sum
+from .forms import ParticipantForm, ScreeningForm, SignupForm, DailyLogForm
+from .models import Participant, ScreeningSession, Site, DailyLog
+from axes.models import AccessAttempt
+import logging
 
-from .forms import ParticipantForm, ScreeningForm, SignupForm,DailyLogForm
-from .models import Participant, ScreeningSession, Site,DailyLog
 
 User = get_user_model()
-
 
 # ---------------------- Helper Functions ----------------------
 
 def get_user_participants(user):
     """Return participants visible to the user."""
     return Participant.objects.all() if user.is_superuser else Participant.objects.filter(site=user.site)
+
 
 def pending_participants(participants):
     """Return participants with any missing items."""
@@ -60,9 +63,7 @@ def completed_participants(participants):
             completed.append(p)
     return completed
 
-
 # ---------------------- Authentication Views ----------------------
-
 def signup(request):
     if request.method == 'POST':
         form = SignupForm(request.POST)
@@ -96,7 +97,7 @@ def signup(request):
                     fail_silently=False,
                 )
             messages.success(request, "Account created successfully. An admin will review and activate your account shortly.")
-            return redirect('tracking:ra_login')
+            return redirect('tracking:login')
         messages.error(request, "Please correct the errors below.")
     else:
         form = SignupForm()
@@ -112,7 +113,7 @@ def approve_user(request, user_id):
     user.is_active = True
     user.save()
 
-    login_url = request.build_absolute_uri(reverse('tracking:ra_login'))
+    login_url = request.build_absolute_uri(reverse('tracking:login'))
     subject = "Your account has been approved ✅"
     from_email = settings.DEFAULT_FROM_EMAIL
     to = [user.email]
@@ -154,6 +155,7 @@ def reject_user(request, user_id):
     <p>Thank you,<br/>Preterm Africa Study Team</p>
     </body></html>
     """
+
     msg = EmailMultiAlternatives(subject, text_content, from_email, to)
     msg.attach_alternative(html_content, "text/html")
     msg.send(fail_silently=False)
@@ -164,17 +166,18 @@ def reject_user(request, user_id):
 
 
 # ---------------------- Login Views (case-insensitive) ----------------------
-
 class CaseInsensitiveLoginForm(AuthenticationForm):
-    """Override AuthenticationForm to allow case-insensitive usernames."""
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if username:
-            username = username.lower()
-        return username
+        return username.lower() if username else username
 
-
-class RAloginView(LoginView):
+    def get_invalid_login_error(self):
+        return ValidationError(
+            "Incorrect username or password. Please try again.",
+            code="invalid_login",
+        )
+#------------------Handles the Logins--------------------
+class CustomLoginView(LoginView):
     template_name = 'registration/login.html'
     authentication_form = CaseInsensitiveLoginForm
 
@@ -183,72 +186,65 @@ class RAloginView(LoginView):
             return self._redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
 
+    def post(self, request, *args, **kwargs):
+        username = request.POST.get('username', '').strip()
+
+        try:
+            user = User.objects.get(username__iexact=username)
+
+            # 🚨 If inactive, stop here (don’t validate password)
+            if not user.is_active:
+                form = self.authentication_form(request, data=request.POST)
+                form.errors.clear()
+                form.add_error(None, "Your account is not yet approved. Please wait for admin approval.")
+                return self.form_invalid(form)
+
+        except User.DoesNotExist:
+            # If user doesn’t exist, stop here too
+            form = self.authentication_form(request, data=request.POST)
+            form.errors.clear()
+            form.add_error(None, "Please Create an Account before attempting to login.")
+            return self.form_invalid(form)
+
+        # Only validate password if user exists AND is active
+        form = self.authentication_form(request, data=request.POST)
+        if form.is_valid():
+            return self.form_valid(form)
+
+        return self.form_invalid(form)
+
     def form_valid(self, form):
         user = form.get_user()
         login(self.request, user)
         return self._redirect_by_role(user)
 
     def _redirect_by_role(self, user):
-        if getattr(user, "role", None) == 'RA':
-            return redirect('tracking:ra_dashboard')
-        if getattr(user, "role", None) == 'RO':
-            return redirect('tracking:ro_dashboard')
-        if getattr(user, "role", None) == 'AD':
-            return redirect('tracking:choose_dashboard')
-        if user.is_superuser:
-            return redirect('tracking:ra_dashboard')
-        return redirect('/')
+        role_redirects = {
+            'RA': 'tracking:ra_dashboard',
+            'RO': 'tracking:ro_dashboard',
+            'AD': 'tracking:choose_dashboard',
+        }
+        return redirect(role_redirects.get(getattr(user, "role", None), '/'))
 
-
-class ROloginView(LoginView):
-    template_name = 'registration/login.html'
-    authentication_form = CaseInsensitiveLoginForm
-
-    def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated:
-            return self._redirect_by_role(request.user)
-        return super().dispatch(request, *args, **kwargs)
-
-    def form_valid(self, form):
-        user = form.get_user()
-        login(self.request, user)
-        return self._redirect_by_role(user)
-
-    def _redirect_by_role(self, user):
-        if getattr(user, "role", None) == 'RO':
-            return redirect('tracking:ro_dashboard')
-        if getattr(user, "role", None) == 'RA':
-            return redirect('tracking:ra_dashboard')
-        if getattr(user, "role", None) == 'AD':
-            return redirect('tracking:choose_dashboard')
-        if user.is_superuser:
-            return redirect('tracking:ra_dashboard')
-        return redirect('/')
-
-
+#--------Logouts-------------------
 @login_required
 def custom_logout_view(request):
     logout(request)
-    return redirect('tracking:ra_login')
-
+    return redirect('tracking:login')
 
 def auto_logout_view(request):
     logout(request)
     messages.warning(request, "Session timed out due to inactivity.")
-    return redirect('tracking:ra_login')
-
-
+    return redirect('tracking:login')
 # ---------------------- Dashboard Views ----------------------
 
 @login_required
 def choose_dashboard(request):
     # Allow access if user is AD (PI), RO, RA, or superuser
     if getattr(request.user, "role", None) not in ['AD', 'RO', 'RA'] and not request.user.is_superuser:
-        return render(
-            request,
-            'tracking/forbidden.html',
-            {'message': "Only PIs, ROs, RAs, or superusers can access this page."}
-        )
+        return render(request, 'tracking/forbidden.html', {
+            'message': "Only PIs, ROs, RAs, or superusers can access this page."
+        })
 
     # Superusers see all participants & screenings
     if request.user.is_superuser:
@@ -274,42 +270,43 @@ def choose_dashboard(request):
         .order_by('site__name')
     )
 
-    return render(
-        request,
-        'tracking/choose_dashboard.html',
-        {
-            'participants': participants,
-            'pending': pending,
-            'completed': completed,
-            'number_screened': number_screened,
-            'site_summary': site_summary,
-        }
-    )
+    return render(request, 'tracking/choose_dashboard.html', {
+        'participants': participants,
+        'pending': pending,
+        'completed': completed,
+        'number_screened': number_screened,
+        'site_summary': site_summary,
+    })
 
-
-@login_required(login_url=reverse_lazy('tracking:ra_login'))
+@login_required(login_url=reverse_lazy('tracking:login'))
 def ra_dashboard(request):
     if getattr(request.user, "role", None) not in ('RA', 'AD') and not request.user.is_superuser:
-        return render(request, 'tracking/forbidden.html', {'message': "Only RAs, PIs, or superusers can access the dashboard."})
+        return render(request, 'tracking/forbidden.html', {
+            'message': "Only RAs, PIs, or superusers can access the dashboard."
+        })
 
     participants = Participant.objects.all() if request.user.is_superuser else Participant.objects.filter(site=request.user.site)
 
-    pending_list = [p for p in participants if not all([
-        p.monitor_downloaded, p.ultrasound_downloaded, p.case_report_form_uploaded,
-        p.video_laryngoscope_uploaded, p.rop_final_report_uploaded,
-        p.head_ultrasound_images_uploaded, p.head_ultrasound_report_uploaded,
-        p.cost_effectiveness_data_uploaded, p.blood_culture_done,
-        p.admission_notes_day1_uploaded
-    ])]
+    pending_list = [
+        p for p in participants if not all([
+            p.monitor_downloaded, p.ultrasound_downloaded, p.case_report_form_uploaded,
+            p.video_laryngoscope_uploaded, p.rop_final_report_uploaded,
+            p.head_ultrasound_images_uploaded, p.head_ultrasound_report_uploaded,
+            p.cost_effectiveness_data_uploaded, p.blood_culture_done,
+            p.admission_notes_day1_uploaded
+        ])
+    ]
 
     sorted_participants = sorted(pending_list, key=lambda p: p.enrollment_date, reverse=True)
     return render(request, 'tracking/ra_dashboard.html', {'participants': sorted_participants})
 
 
-@login_required(login_url=reverse_lazy('tracking:ro_login'))
+@login_required(login_url=reverse_lazy('tracking:login'))
 def ro_dashboard(request):
     if getattr(request.user, "role", None) not in ('RO', 'AD') and not request.user.is_superuser:
-        return render(request, 'tracking/forbidden.html', {'message': "Only ROs, PIs, or superusers can access the dashboard."})
+        return render(request, 'tracking/forbidden.html', {
+            'message': "Only ROs, PIs, or superusers can access the dashboard."
+        })
 
     participants = get_user_participants(request.user)
     pending = [p for p in participants if p not in completed_participants(participants)]
@@ -323,11 +320,9 @@ def ro_dashboard(request):
 def register_participant(request):
     """Register a participant (RA/AD or superuser)."""
     if getattr(request.user, "role", None) not in ('RA', 'AD') and not request.user.is_superuser:
-        return render(
-            request,
-            'tracking/forbidden.html',
-            {'message': "Only RAs, PIs, or superusers can register participants."}
-        )
+        return render(request, 'tracking/forbidden.html', {
+            'message': "Only RAs, PIs, or superusers can register participants."
+        })
 
     # Read ?eligible=N query param
     eligible_qs = request.GET.get("eligible")
@@ -345,11 +340,10 @@ def register_participant(request):
             if not participant.site:
                 if request.user.is_superuser:
                     messages.error(request, "Site must be selected for superuser registration.")
-                    return render(
-                        request,
-                        'tracking/participant_form.html',
-                        {'form': form, 'eligible': eligible_count}
-                    )
+                    return render(request, 'tracking/participant_form.html', {
+                        'form': form,
+                        'eligible': eligible_count
+                    })
                 participant.site = request.user.site
 
             participant.save()
@@ -357,35 +351,33 @@ def register_participant(request):
 
             # Determine which button was pressed
             if "add_another" in request.POST:
-                # Stay on the same form for the next participant
                 return redirect(f"{reverse('tracking:register_participant')}?eligible={eligible_count}")
-            else:
-                # Redirect to RA dashboard (or appropriate dashboard)
-                return redirect('tracking:ra_dashboard')
+            return redirect('tracking:ra_dashboard')
 
-        else:
-            messages.error(request, "Please correct the errors below.")
+        messages.error(request, "Please correct the errors below.")
     else:
         form = ParticipantForm(user=request.user)
 
-    return render(
-        request,
-        'tracking/participant_form.html',
-        {'form': form, 'eligible': eligible_count}
-    )
-
+    return render(request, 'tracking/participant_form.html', {
+        'form': form,
+        'eligible': eligible_count
+    })
 
 
 @login_required
 def participant_detail(request, pk):
     participant = get_object_or_404(Participant, pk=pk)
     if not request.user.is_superuser and participant.site != request.user.site:
-        return render(request, 'tracking/forbidden.html', {'message': "You can only view participants from your site."})
+        return render(request, 'tracking/forbidden.html', {
+            'message': "You can only view participants from your site."
+        })
     can_edit = (getattr(request.user, "role", None) in ['AD', 'RO']) or request.user.is_superuser
-    return render(request, 'tracking/participant_detail.html', {'participant': participant, 'can_edit': can_edit})
+    return render(request, 'tracking/participant_detail.html', {
+        'participant': participant,
+        'can_edit': can_edit
+    })
 
 
-@login_required
 @login_required
 def update_participant(request, pk):
     """Handle POST from participant_detail form; save checkboxes + comments."""
@@ -423,24 +415,25 @@ def update_participant(request, pk):
         participant.save()
         messages.success(request, "Participant record updated successfully.")
 
-        # Role-aware redirect (RO -> ro_dashboard; AD or superuser -> choose_dashboard; fallback -> participant detail)
+        # Role-aware redirect
         if getattr(request.user, "role", None) == "RO":
             return redirect("tracking:ro_dashboard")
         if getattr(request.user, "role", None) == "AD" or request.user.is_superuser:
             return redirect("tracking:choose_dashboard")
         return redirect("tracking:participant_detail", pk=participant.pk)
 
-    # On GET, just go back to detail (form lives on detail page)
     return redirect("tracking:participant_detail", pk=participant.pk)
+# ---------------------- Quick Mark Actions ----------------------
 
-# ---------- Quick Mark Actions ----------
-
-@login_required(login_url=reverse_lazy('tracking:ro_login'))
+@login_required(login_url=reverse_lazy('tracking:login'))
 def mark_monitor_downloaded(request, pk):
     if request.method == 'POST':
         participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')):
+        if not request.user.is_superuser and (
+            participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')
+        ):
             return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
+
         participant.monitor_downloaded = True
         participant.monitor_downloaded_at = timezone.now()
         participant.monitor_downloaded_by = request.user
@@ -449,12 +442,15 @@ def mark_monitor_downloaded(request, pk):
     return redirect('tracking:ro_dashboard')
 
 
-@login_required(login_url=reverse_lazy('tracking:ro_login'))
+@login_required(login_url=reverse_lazy('tracking:login'))
 def mark_ultrasound_downloaded(request, pk):
     if request.method == 'POST':
         participant = get_object_or_404(Participant, pk=pk)
-        if not request.user.is_superuser and (participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')):
+        if not request.user.is_superuser and (
+            participant.site != request.user.site or getattr(request.user, "role", None) not in ('RO', 'AD')
+        ):
             return render(request, 'tracking/forbidden.html', {'message': "Permission denied."})
+
         participant.ultrasound_downloaded = True
         participant.ultrasound_downloaded_at = timezone.now()
         participant.ultrasound_downloaded_by = request.user
@@ -473,20 +469,24 @@ def download_completed_pdf(request):
 
     participants = get_user_participants(request.user)
     participants = participants.filter(monitor_downloaded=True, ultrasound_downloaded=True)
-    fully_completed = [p for p in participants if all([
-        p.head_ultrasound_images_uploaded,
-        p.head_ultrasound_report_uploaded,
-        p.video_laryngoscope_uploaded,
-        p.rop_final_report_uploaded,
-        p.cost_effectiveness_data_uploaded,
-        p.blood_culture_done,
-    ])]
+    fully_completed = [
+        p for p in participants if all([
+            p.head_ultrasound_images_uploaded,
+            p.head_ultrasound_report_uploaded,
+            p.video_laryngoscope_uploaded,
+            p.rop_final_report_uploaded,
+            p.cost_effectiveness_data_uploaded,
+            p.blood_culture_done,
+        ])
+    ]
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = 'attachment; filename="completed_downloads.pdf"'
 
-    doc = SimpleDocTemplate(response, pagesize=landscape(letter),
-                            rightMargin=20, leftMargin=20, topMargin=40, bottomMargin=20)
+    doc = SimpleDocTemplate(
+        response, pagesize=landscape(letter),
+        rightMargin=20, leftMargin=20, topMargin=40, bottomMargin=20
+    )
     elements = []
 
     title_style = ParagraphStyle(name='Title', fontName='Helvetica-Bold', fontSize=16, alignment=1, spaceAfter=20)
@@ -515,14 +515,14 @@ def download_completed_pdf(request):
     col_widths = [max(len(str(d.text)) for d in col) * 6 + 10 for col in zip(*data)]
     table = Table(data, colWidths=col_widths, repeatRows=1)
     style = TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#FFA94D")),
-        ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,0), 6),
-        ('GRID', (0,0), (-1,-1), 0.25, colors.black),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#FFA94D")),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+        ('GRID', (0, 0), (-1, -1), 0.25, colors.black),
     ])
     table.setStyle(style)
     elements.append(table)
@@ -531,7 +531,7 @@ def download_completed_pdf(request):
     return response
 
 
-# ---------- Blog Page ----------
+# ---------------------- Blog Page ----------------------
 
 def blog(request):
     posts = [
@@ -546,9 +546,9 @@ def csrf_failure(request, reason=""):
     return render(request, "csrf_failure.html", status=403)
 
 
-# ----------------- Screening View ----------------------
+# ---------------------- Screening View ----------------------
 
-@login_required()
+@login_required
 def screening_view(request):
     if request.method == "POST":
         try:
@@ -587,47 +587,39 @@ def screening_view(request):
                 messages.error(request, "No site found. Please select a site.")
                 return HttpResponseRedirect(reverse("tracking:screening"))
 
-        # Save the screening session (use model field `date`)
         ScreeningSession.objects.create(
             ra=request.user,
             site=site,
             number_screened=number_screened,
             number_eligible=number_eligible,
-            date=screening_date,   # ✅ updated to match your model field
+            date=screening_date,  # ✅ matches model field
         )
 
-        messages.success(
-            request,
-            f"Screening saved successfully. {number_eligible} participant(s) eligible"
-        )
+        messages.success(request, f"Screening saved successfully. {number_eligible} participant(s) eligible")
 
-        # If eligible participants, redirect to registration
         if number_eligible > 0:
             url = f"{reverse('tracking:register_participant')}?eligible={number_eligible}"
             return HttpResponseRedirect(url)
 
-        # Otherwise, go back to dashboard
         if getattr(request.user, "role", None) == "RA":
             return HttpResponseRedirect(reverse("tracking:ra_dashboard"))
         if getattr(request.user, "role", None) == "RO":
             return HttpResponseRedirect(reverse("tracking:ro_dashboard"))
         return HttpResponseRedirect(reverse("tracking:choose_dashboard"))
 
-    # --- GET request ---
     context = {}
     if request.user.is_superuser or getattr(request.user, "role", None) == "AD":
         context["sites"] = Site.objects.all()
 
     return render(request, "tracking/screening_form.html", context)
 
-#--------------------------------------------------------------------
-#DAILY ACTIVITY
-#--------------------------------------------------------------------
+
+# ---------------------- Daily Activity Logs ----------------------
+
 @login_required
 def daily_log_view(request):
-    # Handle POST submission
     if request.method == 'POST':
-        form = DailyLogForm(request.POST)
+        form = DailyLogForm(request.POST, request.FILES)  # include request.FILES for uploads
         if form.is_valid():
             log = form.save(commit=False)
             log.user = request.user
@@ -636,20 +628,69 @@ def daily_log_view(request):
     else:
         form = DailyLogForm(initial={'date': timezone.localdate()})
 
-    # Filter logs: show only current user's logs
     logs = DailyLog.objects.filter(user=request.user)
 
-    # Get date filters from request (optional)
+    # Optional date filter
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
-
     if start_date and end_date:
         logs = logs.filter(date__range=[start_date, end_date])
 
     context = {
         'form': form,
-        'logs': logs,              # keep your original key name
-        'start_date': start_date,  # added for header printing
-        'end_date': end_date,      # added for header printing
+        'logs': logs,
+        'start_date': start_date,
+        'end_date': end_date,
     }
     return render(request, 'tracking/daily_logs.html', context)
+
+# ---------------------- Axes Custom Lockout View ----------------------
+logger = logging.getLogger("axes.lockout")
+def custom_lockout_view(request, credentials=None, *args, **kwargs):
+    """
+    Persistent Axes lockout page.
+    Registered users -> 30 min lockout.
+    Unregistered users -> permanent lockout until admin unblocks.
+    """
+    username = None
+    ip_address = request.META.get("REMOTE_ADDR")
+    remaining_seconds = 0
+    permanent_lock = False
+
+    if credentials:
+        username = credentials.get("username", "").strip()
+
+    if username:
+        user_exists = User.objects.filter(username__iexact=username).exists()
+
+        # Use the FIRST failed attempt to avoid countdown reset
+        attempt = (
+            AccessAttempt.objects.filter(username=username, ip_address=ip_address)
+            .order_by("attempt_time")  # oldest first
+            .first()
+        )
+
+        if attempt:
+            if user_exists:
+                # Registered user -> limited lockout period
+                lockout_period = getattr(settings, "AXES_COOLOFF_TIME", 0.5) * 60 * 60
+                elapsed = (timezone.now() - attempt.attempt_time).total_seconds()
+                remaining_seconds = max(int(lockout_period - elapsed), 0)
+            else:
+                # Unregistered user -> permanent lock until admin clears
+                permanent_lock = True
+                # 🔐 Log permanent lock for admin review
+                logger.warning(
+                    f"Permanent lockout: username='{username}', "
+                    f"IP={ip_address}, "
+                    f"User-Agent={request.META.get('HTTP_USER_AGENT', 'unknown')}"
+                )
+
+    context = {
+        "cool_off_seconds": remaining_seconds,
+        "permanent_lock": permanent_lock,
+        "blocked_username": username,
+        "ip_address": ip_address,
+    }
+    return render(request, "tracking/account_locked.html", context)
+

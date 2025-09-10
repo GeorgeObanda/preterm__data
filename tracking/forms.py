@@ -1,12 +1,13 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from .models import Participant, Site, ScreeningSession,DailyLog
+from django.utils.translation import gettext_lazy as _
+from .models import Participant, Site, ScreeningSession, DailyLog
 
+# Use get_user_model to reference your CustomUser
 User = get_user_model()
-
 
 # ---------- Screening Form (Step 1) ----------
 class ScreeningForm(forms.ModelForm):
@@ -24,6 +25,7 @@ class ScreeningForm(forms.ModelForm):
     class Meta:
         model = ScreeningSession
         fields = ['number_screened', 'number_eligible']
+
 
 # ---------- Participant Form (Step 2) ----------
 class ParticipantForm(forms.ModelForm):
@@ -53,7 +55,6 @@ class ParticipantForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # RA users: auto-assign site and hide site field
         if self.user and getattr(self.user, 'role', None) == 'RA':
             self.fields.pop('site', None)
         elif self.user and self.user.role in ['AD', 'RO']:
@@ -109,14 +110,6 @@ class SignupForm(UserCreationForm):
     class Meta:
         model = User
         fields = ['username', 'first_name', 'last_name', 'email', 'role', 'site', 'password1', 'password2']
-        widgets = {
-            'username': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter username'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter first name'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter last name'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Enter email address'}),
-            'password1': forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter password'}),
-            'password2': forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm password'}),
-        }
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
@@ -152,6 +145,7 @@ class SignupForm(UserCreationForm):
             user.save()
         return user
 
+# ---------- Daily Log Form ----------
 class DailyLogForm(forms.ModelForm):
     TAG_CHOICES = [
         ("", "Select a tag"),
@@ -168,7 +162,7 @@ class DailyLogForm(forms.ModelForm):
         choices=TAG_CHOICES,
         widget=forms.Select(
             attrs={
-                "class": "form-select form-select-lg",
+                "class": "form-select form-select-sm shadow-sm border border-secondary text-muted",
                 "required": True,
                 "oninvalid": "this.setCustomValidity('Please select a tag')",
                 "oninput": "this.setCustomValidity('')",
@@ -180,7 +174,39 @@ class DailyLogForm(forms.ModelForm):
         model = DailyLog
         fields = ["date", "title", "tag", "content"]
         widgets = {
-            "date": forms.DateInput(attrs={"type": "date", "class": "form-control form-control-lg"}),
-            "title": forms.TextInput(attrs={"class": "form-control form-control-lg", "placeholder": "Short title"}),
-            "content": forms.Textarea(attrs={"class": "form-control form-control-lg", "rows": 4, "placeholder": "Write your observation here..."}),
+            "date": forms.DateInput(
+                attrs={
+                    "type": "date",
+                    "class": "form-control form-control-sm shadow-sm border border-secondary",
+                }
+            ),
+            "title": forms.TextInput(
+                attrs={
+                    "class": "form-control form-control-sm shadow-sm border border-secondary",
+                    "placeholder": "Short title",
+                }
+            ),
+            "content": forms.Textarea(
+                attrs={
+                    "class": "form-control form-control-sm shadow-sm border border-secondary",
+                    "rows": 4,
+                    "placeholder": "Write your observation here...",
+                }
+            ),
         }
+
+
+
+# ---------- Case Insensitive Login Form ----------
+class CaseInsensitiveLoginForm(AuthenticationForm):
+    username = forms.CharField(
+        max_length=254,
+        widget=forms.TextInput(attrs={'autofocus': True, 'class': 'form-control'}),
+        label=_("Username")
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username:
+            username = username.lower()  # case-insensitive login
+        return username

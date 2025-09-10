@@ -10,8 +10,7 @@ urlpatterns = [
 
     # Authentication
     path('signup/', views.signup, name='signup'),
-    path('login/ra/', views.RAloginView.as_view(), name='ra_login'),
-    path('login/ro/', views.ROloginView.as_view(), name='ro_login'),
+    path('login/', views.CustomLoginView.as_view(), name='login'),  # unified login
     path('logout/', views.custom_logout_view, name='custom_logout_view'),
     path('auto-logout/', views.auto_logout_view, name='auto_logout'),
 
