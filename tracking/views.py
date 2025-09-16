@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView,PasswordChangeView
 from django.contrib.auth import login, logout, get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.mail import send_mail, EmailMultiAlternatives
@@ -18,6 +18,7 @@ from reportlab.lib.styles import ParagraphStyle
 from .forms import ParticipantForm, ScreeningForm, SignupForm, DailyLogForm
 from .models import Participant, ScreeningSession, Site, DailyLog
 from axes.models import AccessAttempt
+from datetime import timedelta
 import logging
 
 
@@ -192,7 +193,7 @@ class CustomLoginView(LoginView):
         try:
             user = User.objects.get(username__iexact=username)
 
-            # 🚨 If inactive, stop here (don’t validate password)
+            # If inactive, stop here (don’t validate password)
             if not user.is_active:
                 form = self.authentication_form(request, data=request.POST)
                 form.errors.clear()
@@ -216,6 +217,20 @@ class CustomLoginView(LoginView):
     def form_valid(self, form):
         user = form.get_user()
         login(self.request, user)
+
+        # 🔐 Enforce 90-day password expiry
+        try:
+            profile = user.userprofile
+            if profile.password_last_changed + timedelta(days=90) < timezone.now():
+                messages.warning(
+                    self.request,
+                    "Your password has expired. Please change it before continuing."
+                )
+                return redirect("tracking:force_password_change")
+        except Exception:
+            # fallback if profile missing
+            pass
+
         return self._redirect_by_role(user)
 
     def _redirect_by_role(self, user):
@@ -225,6 +240,7 @@ class CustomLoginView(LoginView):
             'AD': 'tracking:choose_dashboard',
         }
         return redirect(role_redirects.get(getattr(user, "role", None), '/'))
+
 
 #--------Logouts-------------------
 @login_required
@@ -693,4 +709,24 @@ def custom_lockout_view(request, credentials=None, *args, **kwargs):
         "ip_address": ip_address,
     }
     return render(request, "tracking/account_locked.html", context)
+
+
+class ForcePasswordChangeView(PasswordChangeView):
+    template_name = "registration/force_password_change.html"
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # 🔄 Update password_last_changed
+        self.request.user.userprofile.password_last_changed = timezone.now()
+        self.request.user.userprofile.save()
+        messages.success(self.request, "Your password has been updated successfully.")
+
+        # Redirect straight to role dashboard
+        role_redirects = {
+            'RA': reverse_lazy('tracking:ra_dashboard'),
+            'RO': reverse_lazy('tracking:ro_dashboard'),
+            'AD': reverse_lazy('tracking:choose_dashboard'),
+        }
+        user_role = getattr(self.request.user, "role", None)
+        return redirect(role_redirects.get(user_role, reverse_lazy('tracking:blog')))
 
