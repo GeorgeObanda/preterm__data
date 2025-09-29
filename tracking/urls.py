@@ -13,7 +13,7 @@ urlpatterns = [
     path('signup/', views.signup, name='signup'),
     path('login/', views.CustomLoginView.as_view(), name='login'),  # unified login
     path('logout/', views.custom_logout_view, name='custom_logout_view'),
-    path('auto-logout/', views.auto_logout_view, name='auto_logout'),
+    path('auto-logout/', views.auto_logout_view, name='CustomLoginView'),
 
     # Password expiry enforcement
     path('force-password-change/', views.ForcePasswordChangeView.as_view(), name='force_password_change'),

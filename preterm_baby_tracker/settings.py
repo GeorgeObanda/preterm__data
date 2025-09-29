@@ -14,8 +14,10 @@ load_dotenv(BASE_DIR / ".env")
 # -------------------------------
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "replace-me-in-production")
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-
+ALLOWED_HOSTS = ["localhost","127.0.0.1","10.30.166.34","pretermafricastudy.ea.aku.edu"]
+CSRF_TRUSTED_ORIGINS=["http://10.30.166.34:8000"]
+SESSION_COOKIE_SECURE=False
+CSRF_COOKIE_SECURE=False
 # -------------------------------
 # Installed Apps
 # -------------------------------
@@ -82,11 +84,14 @@ WSGI_APPLICATION = 'preterm_baby_tracker.wsgi.application'
 # Database
 # -------------------------------
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        ssl_require=os.environ.get("DJANGO_DB_SSL", "True") == "True",
-    )
+    "default": {
+        'ENGINE':'django.db.backends.postgresql',
+        'NAME':os.environ.get('DB_NAME'),
+        'USER':os.environ.get('DB_USER'),
+        'PASSWORD':os.environ.get('DB_PASSWORD'),
+        'HOST':os.environ.get('DB_HOST','localhost'),
+        'PORT':os.environ.get('DB_PORT','5432'),
+    }
 }
 
 # -------------------------------
@@ -149,8 +154,8 @@ SESSION_SAVE_EVERY_REQUEST = True
 # -------------------------------
 # Security Headers
 # -------------------------------
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+#SESSION_COOKIE_SECURE = True
+#CSRF_COOKIE_SECURE = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_HSTS_SECONDS = 31536000
@@ -174,7 +179,7 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 # Cron Jobs
 # -------------------------------
 CRONJOBS = [
-    ('0 7 * * *', 'django.core.management.call_command', ['send_reminders']),
+    ('0 9 * * *', 'django.core.management.call_command', ['send_reminders']),
 ]
 
 # -------------------------------

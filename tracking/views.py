@@ -183,6 +183,10 @@ class CustomLoginView(LoginView):
     authentication_form = CaseInsensitiveLoginForm
 
     def dispatch(self, request, *args, **kwargs):
+        # Check if session ended due to inactivity
+        if request.session.pop("timed_out", False):
+            messages.warning(request, "You have been logged out due to inactivity.")
+
         if request.user.is_authenticated:
             return self._redirect_by_role(request.user)
         return super().dispatch(request, *args, **kwargs)
